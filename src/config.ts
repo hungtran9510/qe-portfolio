@@ -1,91 +1,120 @@
 export const siteConfig = {
-  name: "Ryan Fitzgerald",
-  title: "Senior Software Engineer",
-  description: "Portfolio website of Ryan Fitzgerald",
-  accentColor: "#1d4ed8",
+  name: "Hung Tran Manh",
+  title: "Senior Quality Engineer / Enthusiast Quality Consultant",
+  description: "Portfolio website of Hung Tran Manh - Senior Quality Engineer specializing in resilient automation systems, CI/CD pipelines, and AI-integrated QA.",
+  accentColor: "#1d4ed8", // Bạn có thể đổi màu này nếu muốn
+  
   social: {
-    email: "your-email@example.com",
-    linkedin: "https://linkedin.com/in/yourprofile",
-    twitter: "https://x.com/rfitzio",
-    github: "https://github.com/RyanFitzgerald",
+    email: "manhhung9510@gmail.com",
+    linkedin: "https://www.linkedin.com/in/h%C3%B9ng-tr%E1%BA%A7n-ab866819a/",
+    twitter: "",
+    github: "",
   },
+  
   aboutMe:
-    "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Rem quos asperiores nihil consequatur tempore cupiditate architecto natus commodi corrupti quas quasi facere est, dignissimos odit nam veniam sapiente ut, vitae eligendi ipsum dolor, nostrum ullam impedit! Corrupti ratione mollitia temporibus necessitatibus, consectetur reiciendis recusandae id, dolorum quaerat, vero pariatur. Ratione!",
-  skills: ["Javascript", "React", "Node.js", "Python", "AWS", "Docker"],
+    "Hello! I’m a Senior Quality Engineer & Enthusiast Quality Consultant. My testing journey started from curiosity and grew into a real passion. I love building resilient automation systems, stabilizing CI/CD pipelines, and recently I’ve been experimenting with how AI can support testers. “Every time I automate a test workflow, the product becomes more resilient.”",
+    
+  skills: [
+    "Katalon", "Appium", "Playwright", "WebdriverIO", 
+    "C#", "Selenium", "Docker", "Jenkins", 
+    "TypeScript", "SQL", "Postman", "BDD"
+  ],
+  
   projects: [
     {
-      name: "AI Dev Roundup Newsletter",
+      name: "AI-Integrated QA Workflows",
       description:
-        "One concise email. Five minutes. Every Tuesday. Essential AI news & trends, production-ready libraries, powerful AI tools, and real-world code examples",
-      link: "https://aidevroundup.com/?ref=devportfolio",
-      skills: ["React", "Node.js", "AWS"],
+        "Experimenting and integrating AI tools into quality assurance processes to enhance test coverage and reduce manual effort in banking domains.",
+      link: "#", // Thay bằng link bài viết hoặc repo nếu có
+      skills: ["AI", "Test Automation", "QA Strategy"],
     },
     {
-      name: "Chrome Extension Mastery: Build Full-Stack Extensions with React & Node.js",
+      name: "Mobile Automation Framework (CBX Australia)",
       description:
-        "Master the art of building production-ready, full-stack Chrome Extensions using modern web technologies and best practices",
-      link: "https://fullstackextensions.com/?ref=devportfolio",
-      skills: ["React", "Node.js", "AWS"],
+        "Established a robust mobile automation framework using TypeScript, Perfecto Device Farm, and Applitools for banking applications.",
+      link: "#",
+      skills: ["TypeScript", "Perfecto", "Applitools", "WebdriverIO"],
     },
     {
-      name: "ExtensionKit",
+      name: "Custom Report Comparison Tool",
       description:
-        "Kit to jump-start your Chrome extension projects with a variety of battle-tested starter templates & examples",
-      link: "https://extensionkit.io/?ref=devportfolio",
-      skills: ["React", "Node.js", "AWS"],
+        "Built custom tools for automated report file comparison, decreasing manual testing time by 40% at TOOGOOD Canada.",
+      link: "#",
+      skills: ["C#", "Automation Tools", "Efficiency"],
     },
   ],
+  
   experience: [
     {
-      company: "Tech Company",
-      title: "Senior Software Engineer",
-      dateRange: "Jan 2022 - Present",
+      company: "CBX Australia",
+      title: "Senior Automation QE",
+      dateRange: "Sep 2023 - Present",
       bullets: [
-        "Led development of microservices architecture serving 1M+ users",
-        "Reduced API response times by 40% through optimization",
-        "Mentored team of 5 junior developers",
+        "Established mobile automation framework for banking apps using TypeScript, Perfecto, WebdriverIO/CucumberJS, and Playwright.",
+        "Integrated UI visual checks via Applitools Execution Cloud and automated test execution in Jenkins CI/CD pipeline.",
+        "Focused on Banking and Chatbot domains with Docker containerization.",
       ],
     },
     {
-      company: "Startup Inc",
-      title: "Full Stack Developer",
-      dateRange: "Jun 2020 - Dec 2021",
+      company: "TOOGOOD Canada",
+      title: "Senior Automation QC",
+      dateRange: "Sep 2021 - Sep 2023",
       bullets: [
-        "Built and launched MVP product from scratch using React and Node.js",
-        "Implemented CI/CD pipeline reducing deployment time by 60%",
-        "Collaborated with product team to define technical requirements",
+        "Built custom tools for report file comparison, significantly reducing manual verification effort.",
+        "Managed testing activities within a 5-member QC team focusing on desktop automation and financial domain.",
+        "Utilized C#, FlaUI, TestComplete, Zephyr, and Jira/Xray for comprehensive test management.",
       ],
     },
     {
-      company: "Digital Agency",
-      title: "Frontend Developer",
-      dateRange: "Aug 2018 - May 2020",
+      company: "BFSI Vietnam",
+      title: "Senior Quality Consultant - Test Lead",
+      dateRange: "Jun 2020 - Sep 2020",
       bullets: [
-        "Developed responsive web applications for 20+ clients",
-        "Improved site performance scores by 35% on average",
-        "Introduced modern JavaScript frameworks to legacy codebases",
+        "Led a 5-member team providing automation and CI/CD solutions to top Banking & Financial Services companies.",
+        "Conducted PoCs for Web, Mobile, Windows, and API solutions using Katalon, Selenium, Serenity BDD, and Appium.",
+        "Managed end-to-end test strategies and device lab integrations.",
+      ],
+    },
+    {
+      company: "GIC Singapore",
+      title: "Senior QC",
+      dateRange: "Jun 2020 - Sep 2020",
+      bullets: [
+        "Managed testing activities for real estate web applications.",
+        "Integrated automation frameworks with ReportPortal.io and Electric Flow for enhanced reporting.",
+        "Performed database validation using SQL alongside Katalon automation.",
+      ],
+    },
+    {
+      company: "O2E Canada",
+      title: "Senior QC",
+      dateRange: "Dec 2019 - Jun 2020",
+      bullets: [
+        "Created an extendable test automation framework using Katalon designed specifically for non-technical customers.",
+        "Delivered web app automation solutions for home services clients in both remote and onsite setups.",
+      ],
+    },
+    {
+      company: "Qtest System Worldwide",
+      title: "Data Migration Specialist",
+      dateRange: "Jan 2018 - Dec 2019",
+      bullets: [
+        "Led data migration projects and built necessary migration scripts for enterprise clients.",
+        "Developed manual test cases and supported the development of a proprietary data comparison tool.",
       ],
     },
   ],
+  
   education: [
     {
-      school: "University Name",
-      degree: "Bachelor of Science in Computer Science",
-      dateRange: "2014 - 2018",
+      school: "Professional Certifications & Training",
+      degree: "Quality Engineering & Test Automation",
+      dateRange: "Continuous Learning",
       achievements: [
-        "Graduated Magna Cum Laude with 3.8 GPA",
-        "Dean's List all semesters",
-        "President of Computer Science Club",
-      ],
-    },
-    {
-      school: "Online Platform",
-      degree: "Full Stack Development Certificate",
-      dateRange: "2019",
-      achievements: [
-        "Completed 500+ hours of coursework",
-        "Built 10+ portfolio projects",
-        "Specialized in React and Node.js",
+        "Achieved 50% increase in test coverage across multiple projects",
+        "Reduced overall test cycle time by 30% through effective automation",
+        "Led teams to achieve 80% defect detection rate",
+        "Developed custom tools decreasing manual testing time by 40%",
       ],
     },
   ],

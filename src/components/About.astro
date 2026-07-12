@@ -1,40 +1,77 @@
 ---
 import { siteConfig } from "../config";
+// Assuming portfolioData is somehow made available, we use hardcoded structure for this change phase.
+const data = {
+    name: "HUNG TRAN MANH",
+    email: "manhhung9510@gmail.com",
+    motto: "Every time I automate a test workflow, the product becomes more resilient.",
+    competencies: ["🛠️ Technologies", "🔬 Methodologies", "🌐 Domain Knowledge", "🤝 Leadership/Process"],
+    techs: ["Katalon", "Appium", "Playwright", "WebdriverIO (WDIO)", "C#", "Selenium", "Docker", "Jenkins", "Jira", "QTest", "ReportPortal.io", "Postman", "SQL."],
+    methods: ["BDD", "Agile", "Blackbox Testing", "Boundary Analysis", "Exploratory Testing."],
+    domains: ["Banking", "Finance (BFSI)", "Real Estate", "Chatbot."],
+    leadership: ["Team Leadership (up to 7 members)", "CI/CD Pipeline Management", "Defect Reduction", "Test Coverage Enhancement."]
+};
 ---
 
 <section id="about" class="p-8 sm:p-12 md:p-16 lg:p-24">
   <div>
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
+      <!-- Title Area -->
       <div class="lg:col-span-4">
         <h2
           class="text-3xl sm:text-4xl md:text-5xl xl:text-7xl font-bold text-gray-900"
         >
-          About Me
+          HUNG TRAN MANH
         </h2>
+        <!-- Simplified visual line based on the data structure -->
         <div
-          class="w-[75px] h-[5px] mt-2 rounded-full"
-          style={`background-color: ${siteConfig.accentColor}`}
-        >
-        </div>
+          class="w-[75px] h-[5px] mt-2 rounded-full bg-indigo-600"
+        ></div>
+        <p class="mt-4 text-sm font-medium text-gray-700">
+            Senior Quality Engineer | Enthusiast QC Consultant
+        </p>
       </div>
 
-      <div class="lg:col-span-8 space-y-8">
-        <p class="text-lg sm:text-xl md:text-2xl leading-relaxed text-gray-600">
-          {siteConfig.aboutMe}
-        </p>
-
-        <div class="pt-4">
-          <div class="flex flex-wrap gap-3">
-            {
-              siteConfig.skills.map((skill) => (
-                <span class="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 text-gray-800 rounded-full text-sm sm:text-base md:text-lg font-medium hover:bg-gray-200 transition-colors duration-200">
-                  {skill}
-                </span>
-              ))
-            }
-          </div>
+      <!-- Content Area -->
+      <div class="lg:col-span-8 space-y-10">
+        <!-- Executive Summary/Pitch Section -->
+        <div>
+            <h3 class="text-2xl font-semibold text-gray-900 mb-3 border-b pb-1">🌟 The Pitch</h3>
+            <p class="text-lg sm:text-xl md:text-xl leading-relaxed text-gray-700">
+                {data.motto} My focus is on delivering robust quality across complex banking and enterprise software domains by building resilient automation systems and stabilizing CI/CD pipelines.
+            </p>
         </div>
+
+        <!-- Core Competencies Section -->
+        <div>
+            <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b pb-1">🧠 Core Competencies</h3>
+            <div class="grid grid-cols-2 gap-y-4 gap-x-6">
+                {data.competencies.map(category => (
+                    <div key={category}>
+                        <p class="font-bold text-gray-800 mb-1">{category}</p>
+                        <ul class="list-disc list-inside text-sm space-y-1 pl-2">
+                            {(category === "🛠️ Technologies" && data.techs.map(t => <li key={t}>{t}</li>)) ||
+                             (category === "🔬 Methodologies" && data.methods.map(m => <li key={m}>{m}</li>)) ||
+                             (category === "🌐 Domain Knowledge" && data.domains.map(d => <li key={d}>{d}</li>)) ||
+                             (category === "🤝 Leadership/Process" && data.leadership.map(l => <li key={l}>{l}</li>)) ?
+                            <>{/* Rendered inside map logic above */}</>
+                            : [] // Fallback rendering nothing if category does not match expected structure
+                        </ul>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        <!-- Experience Section (Simplified Placeholder referencing Experience.astro) -->
+        <div class="pt-4 border-t">
+            <h3 class="text-2xl font-semibold text-gray-900 mb-4">💼 Experience Mapping</h3>
+            <p class="text-gray-700 italic">
+                Detailed roles are mapped in <a href="/experience" class="text-indigo-600 hover:underline">Experience.astro</a>, starting with Senior Automation QE at CBX Australia (Present).
+            </p>
+        </div>
+
       </div>
     </div>
   </div>
 </section>
+
