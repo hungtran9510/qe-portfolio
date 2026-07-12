@@ -1,15 +1,16 @@
 ---
 import { siteConfig } from "../config";
-// Assuming portfolioData is somehow made available, we use hardcoded structure for this change phase.
+
 const data = {
     name: "HUNG TRAN MANH",
     email: "manhhung9510@gmail.com",
     motto: "Every time I automate a test workflow, the product becomes more resilient.",
-    competencies: ["🛠️ Technologies", "🔬 Methodologies", "🌐 Domain Knowledge", "🤝 Leadership/Process"],
-    techs: ["Katalon", "Appium", "Playwright", "WebdriverIO (WDIO)", "C#", "Selenium", "Docker", "Jenkins", "Jira", "QTest", "ReportPortal.io", "Postman", "SQL."],
-    methods: ["BDD", "Agile", "Blackbox Testing", "Boundary Analysis", "Exploratory Testing."],
-    domains: ["Banking", "Finance (BFSI)", "Real Estate", "Chatbot."],
-    leadership: ["Team Leadership (up to 7 members)", "CI/CD Pipeline Management", "Defect Reduction", "Test Coverage Enhancement."]
+    competencies: [
+        { title: "🛠️ Technologies", items: ["Katalon", "Appium", "Playwright", "WebdriverIO (WDIO)", "C#", "Selenium", "Docker", "Jenkins", "Jira", "QTest", "ReportPortal.io", "Postman", "SQL"] },
+        { title: "🔬 Methodologies", items: ["BDD", "Agile", "Blackbox Testing", "Boundary Analysis", "Exploratory Testing"] },
+        { title: "🌐 Domain Knowledge", items: ["Banking", "Finance (BFSI)", "Real Estate", "Chatbot"] },
+        { title: "🤝 Leadership/Process", items: ["Team Leadership (up to 7 members)", "CI/CD Pipeline Management", "Defect Reduction", "Test Coverage Enhancement"] }
+    ]
 };
 ---
 
@@ -18,15 +19,10 @@ const data = {
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
       <!-- Title Area -->
       <div class="lg:col-span-4">
-        <h2
-          class="text-3xl sm:text-4xl md:text-5xl xl:text-7xl font-bold text-gray-900"
-        >
-          HUNG TRAN MANH
+        <h2 class="text-3xl sm:text-4xl md:text-5xl xl:text-7xl font-bold text-gray-900">
+          {data.name}
         </h2>
-        <!-- Simplified visual line based on the data structure -->
-        <div
-          class="w-[75px] h-[5px] mt-2 rounded-full bg-indigo-600"
-        ></div>
+        <div class="w-[75px] h-[5px] mt-2 rounded-full bg-indigo-600"></div>
         <p class="mt-4 text-sm font-medium text-gray-700">
             Senior Quality Engineer | Enthusiast QC Consultant
         </p>
@@ -45,17 +41,14 @@ const data = {
         <!-- Core Competencies Section -->
         <div>
             <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b pb-1">🧠 Core Competencies</h3>
-            <div class="grid grid-cols-2 gap-y-4 gap-x-6">
-                {data.competencies.map(category => (
-                    <div key={category}>
-                        <p class="font-bold text-gray-800 mb-1">{category}</p>
-                        <ul class="list-disc list-inside text-sm space-y-1 pl-2">
-                            {(category === "🛠️ Technologies" && data.techs.map(t => <li key={t}>{t}</li>)) ||
-                             (category === "🔬 Methodologies" && data.methods.map(m => <li key={m}>{m}</li>)) ||
-                             (category === "🌐 Domain Knowledge" && data.domains.map(d => <li key={d}>{d}</li>)) ||
-                             (category === "🤝 Leadership/Process" && data.leadership.map(l => <li key={l}>{l}</li>)) ?
-                            <>{/* Rendered inside map logic above */}</>
-                            : [] // Fallback rendering nothing if category does not match expected structure
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
+                {data.competencies.map((cat) => (
+                    <div>
+                        <p class="font-bold text-gray-800 mb-2 text-lg">{cat.title}</p>
+                        <ul class="list-disc list-inside text-sm space-y-1 pl-2 text-gray-600">
+                            {cat.items.map((item) => (
+                                <li>{item}</li>
+                            ))}
                         </ul>
                     </div>
                 ))}
@@ -74,4 +67,3 @@ const data = {
     </div>
   </div>
 </section>
-
