@@ -1,0 +1,30 @@
+---
+// src/components/ScrollToTop.astro
+---
+<button
+  id="scroll-to-top"
+  class="fixed bottom-8 right-8 bg-[var(--accent-color, #1d4ed8)] text-white p-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 hover:opacity-90 z-50 flex items-center justify-center"
+  aria-label="Scroll to top"
+>
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+  </svg>
+</button>
+
+<script is:inline>
+  const btn = document.getElementById("scroll-to-top");
+  
+  window.addEventListener("scroll", () => {
+    if (window.scrollY > 300) {
+      btn.classList.remove("opacity-0", "pointer-events-none");
+      btn.classList.add("opacity-100", "pointer-events-auto");
+    } else {
+      btn.classList.add("opacity-0", "pointer-events-none");
+      btn.classList.remove("opacity-100", "pointer-events-auto");
+    }
+  });
+
+  btn.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+</script>

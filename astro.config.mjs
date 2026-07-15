@@ -1,10 +1,13 @@
-// @ts-check
-import { defineConfig } from "astro/config";
-import tailwindcss from "@tailwindcss/vite";
+import { defineCollection, z } from 'astro:content';
 
-// https://astro.build/config
-export default defineConfig({
-  vite: {
-    plugins: [tailwindcss()],
-  },
+const blog = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    date: z.date(),
+    description: z.string().optional(),
+    tags: z.array(z.string()).optional()
+  })
 });
+
+export const collections = { blog };
