@@ -1,7 +1,7 @@
 ---
 title: "Playwright E2E Testing nâng cao: Page Object Model và xử lý Dynamic Elements"
 date: 2026-06-25
-description: "Nắm vững Playwright E2E testing với kiến trúc POM chuyên nghiệp và các kỹ thuật xử lý phần tử động, giảm thiểu lỗi Test Flakiness."
+description: "Làm chủ các kỹ thuật kiểm thử E2E bằng Playwright: Triển khai Page Object Model (POM) và chiến lược vững chắc để đối phó với các phần tử động."
 tags: ["Automation","Playwright","TypeScript"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Hoàng Hiệp"
@@ -9,165 +9,203 @@ author: "Hoàng Hiệp"
 
 # Playwright E2E Testing nâng cao: Page Object Model và xử lý Dynamic Elements
 
-**Tác giả:** Hoàng Hiệp - QE Lead
-**Ngày xuất bản:** 25 tháng 6 năm 2026
+Xin chào các đồng nghiệp Automation Engineer! Tôi là Hoàng Hiệp.
 
-***
+Trong thế giới của kiểm thử phần mềm hiện đại, khả năng tự động hóa kiểm thử đầu cuối (End-to-End - E2E) bằng Playwright là một lợi thế cực lớn. Tuy nhiên, chỉ biết viết các lệnh `await page.click()` đơn thuần sẽ nhanh chóng đưa bạn vào "bẫy của sự giòn (flakiness)". Các ứng dụng web ngày càng phức tạp với cấu trúc DOM biến đổi liên tục và các phần tử được tải bất đồng bộ (asynchronous).
 
-Trong kỷ nguyên phát triển phần mềm liên tục (CI/CD), việc đảm bảo chất lượng trải nghiệm người dùng (User Experience) qua các giao diện phức tạp là tối quan trọng. Automated End-to-End (E2E) Testing chính là lá chắn vững chắc nhất. Với sự ra mắt của Playwright, chúng ta có một công cụ mạnh mẽ với khả năng hỗ trợ đa trình duyệt và tốc độ vượt trội.
-
-Tuy nhiên, chỉ biết viết các lệnh `page.click()` liên tục là chưa đủ để trở thành một Kỹ sư QE (Quality Engineer) thực thụ. Để xây dựng một hệ thống kiểm thử tự động **có tính mở rộng (scalable)**, **dễ bảo trì (maintainable)** và đặc biệt là **ít lỗi giật (flaky)**, chúng ta cần làm chủ hai kỹ thuật nâng cao: **Page Object Model (POM)** và xử lý các **Dynamic Elements**.
-
-Bài viết này sẽ đi sâu vào kiến trúc giải quyết những thách thức đó.
+Nếu bạn đã quen thuộc với việc viết test cơ bản, bài viết này dành cho bạn. Chúng ta sẽ cùng nhau đi sâu vào hai chủ đề cốt lõi để nâng tầm kỹ năng kiểm thử của mình: **Page Object Model (POM)** để đảm bảo tính cấu trúc và khả năng bảo trì, và các chiến lược nâng cao để xử lý **Dynamic Elements** một cách mạnh mẽ.
 
 ---
 
-## 💡 Phần I: Tại sao cần Page Object Model (POM)?
+## I. Page Object Model (POM): Kiến trúc cho sự ổn định
 
-Khi hệ thống kiểm thử của chúng ta phát triển lên quy mô lớn, bạn sẽ gặp phải một vấn đề chung: các Test Case bắt đầu trở nên dài dòng, lặp lại nhiều selector và logic tương tác giống nhau. Nếu giao diện người dùng thay đổi dù chỉ là việc đổi ID của một nút bấm, hàng chục bài test có thể bị hỏng cùng lúc.
+### 💡 Vấn đề cần giải quyết
 
-Đây chính là lý do chúng ta cần áp dụng **Page Object Model (POM)**.
+Khi bạn viết các test case mà không tuân thủ POM, mã nguồn của bạn sẽ trở thành một khối lộn xộn gồm hàng trăm dòng lệnh Playwright và các selector trực tiếp nhúng vào logic nghiệp vụ (Business Logic). Điều này gây ra hai vấn đề nghiêm trọng:
 
-### 📚 POM là gì?
+1. **Tính tái sử dụng thấp:** Nếu tên hoặc selector của một nút bấm thay đổi, bạn phải sửa code ở *mọi* test case mà nó được sử dụng.
+2. **Khó đọc và khó bảo trì:** Các file test quá dài sẽ làm lu mờ logic kiểm thử cốt lõi.
 
-Về bản chất, POM yêu cầu bạn tạo ra một lớp (Class) đại diện cho từng trang hoặc thành phần giao diện lớn trên ứng dụng của mình. Các lớp này không chỉ chứa các selector (selectors) mà còn gói gọn các **phương thức tương tác (methods)** mà người dùng sẽ thực hiện trên trang đó.
+### 🛡️ POM là gì?
 
-**Mục tiêu chính:** Tách biệt hoàn toàn logic kiểm thử (Test Logic) khỏi chi tiết giao diện (UI Details/Selectors).
+POM là một mô hình thiết kế trong đó, chúng ta tạo các lớp (Class) đại diện cho các trang hoặc thành phần giao diện người dùng (UI Components). Mỗi lớp này sẽ chứa:
+1. Các selector đã được định nghĩa rõ ràng.
+2. Các phương thức (methods) thực hiện các hành vi nghiệp vụ trên trang đó (ví dụ: `loginWithCredentials()`, `navigateToDashboard()`).
 
-### 📐 Ví dụ Minh họa: Triển khai POM với Playwright và TypeScript
+### ✍️ Ví dụ minh họa (TypeScript/Playwright)
 
-Giả sử chúng ta có một trang Đăng nhập (`LoginPage`). Thay vì viết selector trực tiếp trong Test File, chúng ta tạo một lớp riêng.
+Giả sử chúng ta có một trang Đăng nhập (`Login Page`). Thay vì viết selectors trực tiếp trong file test, chúng ta sẽ tạo ra lớp riêng.
 
-**1. Tạo Page Object Class:** `pages/LoginPage.ts`
+**1. Tạo Module Components (Selector Definitions):**
+*(Best Practice: Tách selector khỏi phương thức để tăng khả năng tái sử dụng)*
 
 ```typescript
-import { Page, Locator } from '@playwright/test';
+// src/pages/LoginPage/selectors.ts
+
+export const selectors = {
+  usernameInput: '#username',
+  passwordInput: '#password',
+  loginButton: 'button[type="submit"]', // Sử dụng attribute selector an toàn hơn ID
+};
+```
+
+**2. Tạo Page Object Class:**
+
+```typescript
+// src/pages/LoginPage/Login.page.ts
+
+import { Page, expect } from '@playwright/test';
+import { selectors } from './selectors';
 
 export class LoginPage {
-    readonly page: Page;
-    // Định nghĩa selectors và lưu trữ chúng dưới dạng properties
-    private readonly usernameInput: Locator = this.page.locator('#username');
-    private readonly passwordInput: Locator = this.page.locator('#password');
-    private readonly loginButton: Locator = this.page.locator('button[type="submit"]');
+  readonly page: Page;
 
-    constructor(page: Page) {
-        this.page = page;
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  // Phương thức hành vi nghiệp vụ (Behavior Method)
+  async login(username: string, password: string): Promise<void> {
+    console.log("Bắt đầu quy trình đăng nhập...");
+    await this.page.fill(selectors.usernameInput, username);
+    await this.page.fill(selectors.passwordInput, password);
+    // Sử dụng bộ chọn an toàn hơn (ví dụ: text=Login) thay vì chỉ dựa vào class
+    await this.page.click(selectors.loginButton); 
+  }
+
+  async expectSuccessfulLogin(): Promise<void> {
+    // Xác nhận rằng sau khi login, tiêu đề trang có chứa 'Dashboard'
+    await expect(this.page).toHaveTitle(/Dashboard/);
+  }
+}
+```
+
+**3. Sử dụng trong Test File:**
+
+```typescript
+// tests/auth.spec.ts (File test đã sạch sẽ và tập trung vào logic nghiệp vụ)
+
+import { test, expect } from '@playwright/test';
+import { LoginPage } from '../pages/LoginPage/Login.page';
+
+test('Kiểm thử đăng nhập thành công', async ({ page }) => {
+  const loginPage = new LoginPage(page);
+  await page.goto('/login'); // Điều hướng đến trang
+
+  // Chỉ gọi hành vi, không cần biết cách các bước đó được thực hiện!
+  await loginPage.login('user@test.com', 'securepassword123');
+  
+  // Kiểm tra kết quả (Assertion)
+  await loginPage.expectSuccessfulLogin(); 
+});
+```
+
+> **💡 Góc nhìn của Hoàng Hiệp:** Nhờ POM, khi đội Frontend thay đổi ID của trường nhập liệu từ `#username` thành `[data-testid="username"]`, tôi chỉ cần sửa một dòng trong file `selectors.ts`. Hàng trăm lines code test case kia sẽ hoàn toàn không bị ảnh hưởng. Đây chính là sức mạnh bảo trì của kiến trúc này.
+
+---
+
+## II. Xử lý Dynamic Elements: Đối phó với sự bất đồng bộ
+
+Trong thực tế, các trang web hiện đại rất hiếm khi tải mọi thứ cùng một lúc. Các phần tử thường xuất hiện sau một độ trễ (delay), chúng có thể được thêm vào qua AJAX, và đôi khi selector của chúng lại là các class ngẫu nhiên (`class="kj-z3x"`). Đây gọi là **Dynamic Elements**.
+
+Việc cố gắng tương tác với một Dynamic Element chưa sẵn sàng sẽ dẫn đến lỗi `Timeout` hoặc `Element not found`. Playwright cung cấp nhiều cơ chế để giải quyết vấn đề này.
+
+### 🚀 Kỹ thuật 1: Sử dụng Waiters tích hợp của Playwright (Implicit Waiting)
+
+Đây là cách căn bản và hiệu quả nhất. Thay vì dùng `sleep()`, hãy tận dụng khả năng chờ đợi thông minh của Playwright bằng các hàm như `waitForSelector()` hoặc đơn giản là các hành động click/fill mà Playwright tự động thực hiện wait.
+
+```typescript
+// KHÔNG NÊN: Chỉ nên sử dụng khi cần thiết và kiểm soát được độ trễ
+await page.click('#loading-spinner'); 
+await page.waitForTimeout(2000); // Tệ hại, khiến test chạy chậm nếu không cần
+
+// NÊN DÙNG: Playwright tự động chờ selector này sẵn sàng trước khi hành động
+await page.fill('#searchbox', 'Laptop X'); // Nếu #searchbox chưa hiện, nó sẽ chờ
+```
+
+### 🌐 Kỹ thuật 2: Sử dụng XPath hoặc CSS Selectors theo thuộc tính ổn định (The Robust Selector)
+
+Các class ngẫu nhiên là kẻ thù lớn nhất của automation. Hãy luôn ưu tiên những selector *ít thay đổi* hơn và mang tính ngữ nghĩa hơn.
+
+| Độ Ưu Tiên | Loại Selector | Ví dụ | Lý do nên dùng |
+| :---: | :--- | :--- | :--- |
+| **Cao nhất** | `data-testid` (Custom Attribute) | `[data-testid="checkout-button"]` | Đây là selector mà đội Dev nên cung cấp cho QA, vì nó không liên quan đến CSS hay cấu trúc giao diện. |
+| **Trung bình cao** | ID (`#id`) | `#userProfilePicture` | Nếu ID được thiết lập đúng cách và duy nhất. |
+| **Trung bình** | Semantic Selectors | `text=Tải hồ sơ` hoặc `button:has-text("Submit")` | Dựa vào nội dung văn bản, rất mạnh mẽ cho các nút bấm. |
+| **Thấp** | Class Name (`.class`) | `.bg-primary.btn` | Rất dễ bị hỏng nếu Dev thay đổi CSS framework. |
+
+### 🌟 Kỹ thuật 3: Xử lý Interacting Elements và WaitFor
+
+Khi bạn cần tương tác với một phần tử mà chỉ hiện ra sau khi một hành động nào đó xảy ra (ví dụ: click nút "Xem chi tiết" -> bảng dữ liệu xuất hiện), hãy sử dụng `waitForSelector()` kết hợp với **Chờ điều kiện**.
+
+```typescript
+// Giả định rằng Data Table chứa thông tin sản phẩm sẽ load sau khi bấm nút Xem Chi Tiết
+const detailTableSelector = '#product-detail-table'; 
+
+// Chờ bảng dữ liệu xuất hiện trước khi bắt đầu các tương tác trên nó.
+await page.waitForSelector(detailTableSelector); 
+
+// Sau đó mới thực hiện hành động (ví dụ: lấy giá trị từ ô thứ hai)
+const priceElement = page.locator(`${detailTableSelector} tr:nth-child(2) td:nth-child(3)`);
+await expect(priceElement).toBeVisible();
+```
+
+---
+
+## III. Tổng hợp: Kết hợp POM và Chiến lược Dynamic Selectors
+
+Sức mạnh thực sự nằm ở việc kết hợp hai kỹ thuật trên. Chúng ta cần một kiến trúc POM vững chắc, nhưng trong các lớp Page Object, chúng ta phải đảm bảo rằng selector được định nghĩa là *robust* nhất có thể.
+
+### Ví dụ Thực hành: Form Tìm kiếm Động (Dynamic Search Form)
+
+Giả sử trang tìm kiếm phức tạp với bộ lọc và kết quả tải bất đồng bộ.
+
+**1. Cập nhật Selector trong POM:**
+Thay vì chỉ dùng CSS thuần, chúng ta sẽ xác định cả các loại selector khác nhau.
+
+```typescript
+// src/pages/SearchPage/selectors.ts (Cải tiến)
+
+export const selectors = {
+  searchQueryInput: '[data-testid="global-search"]', // Luôn ưu tiên data-test
+  filterDropdown: 'div[role="listbox"]',             // Dùng ARIA role để tìm bộ lọc
+  resultListContainer: '.product-grid > div',        // Lớp container cho các kết quả sản phẩm
+  itemCardTitle: ':has(h3)',                        // Selector phức tạp hơn, ví dụ: tìm thẻ H3 bên trong card nào đó
+};
+
+export class SearchPage {
+    // ... constructor và page property
+    async searchForProduct(query: string): Promise<void> {
+        await this.page.fill(selectors.searchQueryInput, query);
+        await this.page.click('#submit-search'); // Giả sử nút submit có ID ổn định
     }
 
-    // Phương thức tương tác (Action Method)
-    async navigateToLoginPage() {
-        await this.page.goto('/login');
-    }
+    // Phương thức này phải chờ đợi một danh sách kết quả tải xong
+    async getAvailableProductTitles(): Promise<string[]> {
+      console.log("Chờ container chứa sản phẩm xuất hiện...");
+      await this.page.waitForSelector(selectors.resultListContainer, { state: 'attached' });
 
-    // Abstracting the Login Logic
-    async loginAs(username: string, password: string): Promise<void> {
-        console.log("Executing login sequence...");
-        await this.usernameInput.fill(username); // Hành động 1
-        await this.passwordInput.fill(password); // Hành động 2
-        await this.loginButton.click(); // Hành động 3
+      // Lấy tất cả các tiêu đề trong container đã load
+      const elements = await this.page->locator(`${selectors.resultListContainer} h3`).allTextContents();
+      return elements;
     }
 }
 ```
 
-**2. Sử dụng trong Test File:** `tests/auth.spec.ts`
+**2. Test Case Cuối cùng (Tự tin và hiệu quả):**
 
-```typescript
-import { test, expect } from '@playwright/test';
-import { LoginPage } from '../pages/LoginPage';
-
-test('Should successfully log in with valid credentials', async ({ page }) => {
-    // Khởi tạo Page Object
-    const loginPage = new LoginPage(page); 
-
-    await loginPage.navigateToLoginPage(); // Chỉ gọi hàm, không cần biết cách nó đi đến trang nào
-    
-    // Thực thi hành động qua phương thức đã được đóng gói
-    await loginPage.loginAs('testuser', 'securepass123'); 
-    
-    // Kiểm tra kết quả sau khi thoát khỏi lớp POM (ví dụ: chuyển hướng)
-    await expect(page).toHaveURL('/dashboard'); 
-});
-```
-
-#### Phân tích của Hoàng Hiệp:
-
-*   **Tính sạch sẽ (Cleanliness):** File `auth.spec.ts` giờ đây rất dễ đọc, nó kể một câu chuyện về các hành động test ("Navigate -> Login -> Assert"). Logic nghiệp vụ hoàn toàn tách khỏi selector `#username`.
-*   **Bảo trì (Maintainability):** Nếu ID của ô nhập tên người dùng thay đổi từ `#username` thành `input[name="user"]`, bạn chỉ cần sửa **một dòng code** trong file `LoginPage.ts`. Toàn bộ các Test Case đang sử dụng lớp này sẽ tự động được cập nhật mà không cần chỉnh sửa bất kỳ hàm test nào.
+File test của bạn giờ đây không chỉ sạch hơn mà còn có khả năng chịu lỗi cao, vì nó đã tích hợp các chiến lược chờ đợi và selector robust vào chính các phương thức POM.
 
 ---
 
-## 🌪️ Phần II: Đối phó với Dynamic Elements - Bài toán của mọi QE
+## Lời kết từ Hoàng Hiệp
 
-Trong thế giới thực, ứng dụng rất hiếm khi tĩnh. Các element như thông báo popup (notifications), các thành phần tải bằng AJAX, hoặc các danh sách kết quả được lọc theo thời gian thực đều là **Dynamic Elements**. Đây là nguồn gốc chính gây ra hiện tượng *Test Flakiness* – bài test đôi khi pass, đôi khi fail mà không có lý do rõ ràng.
+Kiểm thử E2E là việc mô phỏng trải nghiệm người dùng thật nhất, do đó, nó luôn là nơi gặp nhiều thách thức về mặt kỹ thuật hơn bất kỳ loại test nào khác.
 
-Làm thế nào để Playwright xử lý chúng một cách "thông minh"?
+Hãy ghi nhớ ba nguyên tắc vàng sau để trở thành một QE Lead thực thụ:
 
-### 🚀 Nguyên tắc vàng: Không nên chỉ dựa vào `await page.waitForTimeout(3000)`!
+1. **Tư duy Kiến trúc (POM):** Luôn tách biệt giữa *Hành vi nghiệp vụ* (Business Logic - nằm trong Test file) và *Chi tiết kỹ thuật giao diện* (Implementation Details - nằm trong POM/Selectors).
+2. **Ưu tiên Selector:** Không bao giờ tin tưởng vào Class Name hoặc thẻ HTML mà đội Dev không cố ý thêm vào. Hãy yêu cầu họ sử dụng `data-testid`.
+3. **Không Giả định Tốc độ:** Thay vì giả định một hành động sẽ diễn ra ngay lập tức, hãy luôn hỏi: "Điều kiện nào phải được thỏa mãn trước khi tôi thực hiện bước này?" (Sử dụng `waitFor` và các cơ chế chờ điều kiện của Playwright).
 
-Sử dụng `sleep()` hay `setTimeout` là phương pháp thủ công, cực kỳ tệ hại vì nó làm chậm test và không đảm bảo element thực sự đã sẵn sàng (có thể đến sau 1 giây thay vì 3).
-
-Playwright đã được thiết kế với các cơ chế chờ đợi thông minh hơn nhiều. Bạn phải tận dụng chúng:
-
-### Kỹ thuật 1: Chờ đợi Sự hiện diện của Element (`await expect(locator).toBeVisible()`)
-
-Đây là cách tốt nhất để đảm bảo element không chỉ tồn tại trong DOM mà còn *hiển thị* và sẵn sàng tương tác.
-
-```typescript
-// Sai/Thứ cấp: Chỉ kiểm tra xem selector có trả về cái gì đó hay không
-// await page.waitForSelector('.dynamic-result') 
-
-// ✅ Đúng nhất: Chờ đến khi element thực sự hiển thị và khả dụng cho hành động
-await expect(page.locator('.dynamic-result')).toBeVisible();
-
-// Sau đó mới tương tác
-await page.locator('.dynamic-result').click();
-```
-
-### Kỹ thuật 2: Xử lý Selector Phức tạp (Pseudo-selectors & XPath)
-
-Khi một element được bọc trong nhiều lớp dynamic, việc chọn selector cần phải chính xác. Hãy kết hợp các bộ chọn càng cụ thể càng tốt.
-
-**Ví dụ:** Một nút bấm luôn nằm sau khi thanh tải AJAX biến mất.
-```typescript
-// Sử dụng Playwright Locator và chờ sự biến mất của loader trước
-const loader = page.locator('#loading-spinner');
-await expect(loader).toBeHidden(); // Chờ cho đến khi spinner không còn hiển thị
-
-// Sau đó mới tìm nút bấm (hiện tại đã sẵn sàng)
-await page.getByRole('button', { name: 'Submit' }).click(); 
-```
-
-### Kỹ thuật 3: Xử lý Danh sách động (List Rendering/Virtual Scrolling)
-
-Khi bạn làm việc với các bảng dữ liệu lớn hoặc danh sách cuộn ảo, selector CSS truyền thống có thể không hoạt động. Bạn cần sử dụng kỹ thuật **Chờ theo số lượng** (`Locator` count).
-
-Giả sử chúng ta muốn chờ 5 mục kết quả được tải:
-```typescript
-// Lấy Locator chung cho mỗi item trong danh sách
-const listItemLocator = page.locator('.data-list-item');
-
-// Chờ đợi tối đa 10 giây, và kiểm tra xem locator này có ít nhất N phần tử không.
-await expect(listItemLocator).toHaveCount(5); 
-```
-
-#### Tóm tắt cách tiếp cận Dynamic Elements của Hoàng Hiệp:
-
-| Vấn đề | Cách giải quyết nên dùng | Hàm Playwright/Best Practice |
-| :--- | :--- | :--- |
-| **Element chưa kịp tải** | Chờ đợi trạng thái (State Waiting) | `await expect(locator).toBeVisible()` hoặc `.toHaveCount(N)` |
-| **Tương tác cần chờ sự kiện** | Sử dụng Listener / Actionability Check | `await page.waitForSelector()` + Kiểm tra hành vi (Click/Fill) |
-| **Phụ thuộc nhiều selector** | Giữ POM ở lớp thành phần (Component Layer) | Tách các component UI nhỏ thành một "Sub-Page Object" riêng |
-
----
-
-## 📝 Kết luận và Best Practices từ Hoàng Hiệp
-
-Xây dựng hệ thống E2E Testing không chỉ là chạy code, mà còn là kiến trúc hóa quy trình kiểm thử.
-
-Để nâng cao khả năng kiểm test của bạn lên cấp độ chuyên nghiệp (QE Lead Level), hãy ghi nhớ các nguyên tắc sau:
-
-1.  **Tầng trừu tượng (Abstraction Layer):** Luôn luôn sử dụng POM. Đừng bao giờ để selector và hành động nghiệp vụ lẫn lộn trong file Test Case chính.
-2.  **Ưu tiên Độ tin cậy:** Khi đối mặt với Dynamic Elements, hãy chuyển tư duy từ "Waiting" sang **"Assertion on State"**. Thay vì chờ thời gian, bạn phải chờ một *điều kiện* nào đó được thỏa mãn (`expect(locator).toBeVisible()`).
-3.  **TypeScript là Vua:** Sử dụng TypeScript để khai báo rõ ràng kiểu dữ liệu cho các tham số đầu vào và hành động của các phương thức trong POM. Điều này giúp phát hiện lỗi compile-time, tiết kiệm rất nhiều thời gian debug runtime.
-
-Hãy biến hệ thống kiểm test tự động của bạn thành một tài sản kiến trúc (Architectural Asset), chứ không chỉ là một tập hợp các đoạn script chạy tuần tự. Chúc các bạn xây dựng được những bộ test cực kỳ vững chắc!
+Chúc các bạn thành công trong việc xây dựng những bộ test E2E bền vững và hiệu suất cao! Nếu có bất kỳ thắc mắc nào về thiết kế framework automation, đừng ngần ngại trao đổi với tôi.
