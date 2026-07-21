@@ -1,169 +1,151 @@
 ---
 title: "Thiết lập Mock Server nâng cao cho Mobile App Testing bằng WireMock và Appium"
 date: 2026-05-14
-description: "Khám phá chiến lược testing hiện đại: Sử dụng WireMock để kiểm soát API response, tối ưu hóa độ tin cậy của Mobile Test bằng Appium."
-tags: ["Mobile Testing","Appium","WireMock","API Mocking"]
+description: "Hướng dẫn chuyên sâu cách sử dụng WireMock để thiết lập các API mock server phức tạp, đảm bảo Mobile App Test chạy ổn định với Appium."
+tags: ["Mobile Testing","Appium","WireMock","QA Automation"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Khánh Đỗ"
 ---
 
 # Thiết lập Mock Server nâng cao cho Mobile App Testing bằng WireMock và Appium
 
-Chào các đồng nghiệp trong lĩnh vực Chất lượng phần mềm! Tôi là Khánh Đỗ, một Quality Engineer với niềm đam mê tối ưu hóa quy trình kiểm thử.
+**(Từ góc nhìn của một QE Lead)**
 
-Trong kỷ nguyên phát triển DevOps và Continuous Integration/Continuous Deployment (CI/CD), việc đảm bảo chất lượng của ứng dụng di động không chỉ đơn thuần là chạy test case. Thách thức lớn nhất chúng ta thường gặp là sự phụ thuộc vào các dịch vụ backend phức tạp, đôi khi không ổn định hoặc chưa hoàn thiện (under-development).
+Trong hành trình tự động hóa kiểm thử ứng dụng di động (Mobile App Testing), chúng ta thường đối mặt với một vấn đề cốt lõi: sự phụ thuộc. Ứng dụng di động hiện đại hiếm khi hoạt động độc lập; nó liên tục giao tiếp qua API backend để lấy dữ liệu, xác thực người dùng, và xử lý logic nghiệp vụ.
 
-Nếu cứ để Appium tương tác trực tiếp với môi trường API thực tế (Staging/Dev), mọi bài test E2E của chúng ta sẽ trở thành "nạn nhân" của bất kỳ sự cố nào ở phía backend – dù là một lỗi schema, một độ trễ không mong muốn hay thậm chí là downtime.
+Khi bạn chạy các bài kiểm thử End-to-End (E2E) bằng Appium, nếu việc kết nối tới Backend thật không ổn định, chậm chạp hoặc bị gián đoạn do lịch bảo trì hệ thống, toàn bộ chu trình kiểm thử của bạn sẽ trở nên **không đáng tin cậy (flaky)** và rất khó để gỡ lỗi.
 
-Vậy làm thế nào để xây dựng một môi trường Mobile Test hoàn toàn độc lập, đáng tin cậy và có khả năng tái tạo (repeatable) cao? Câu trả lời nằm ở việc sử dụng **Mock Server**. Bài viết hôm nay của tôi sẽ đi sâu vào chiến lược thiết lập Mock Server nâng cao bằng sự kết hợp mạnh mẽ giữa **WireMock** và **Appium**.
+Bài viết này là một hướng dẫn chuyên sâu dành cho các QA Engineers và SDET muốn nâng cao quy trình testing bằng cách thiết lập một kiến trúc giả lập hoàn hảo: sử dụng **WireMock** làm Mock Server mạnh mẽ, kết nối với Appium Automation Framework.
 
 ***
 
-## I. Tổng quan về Triết lý Mô phỏng (The Philosophy of Mocking)
+## 💡 Phần I: Hiểu rõ Kiến Trúc (The Architecture)
 
-Trước khi đi vào code, chúng ta cần hiểu tại sao cách tiếp cận này lại vượt trội:
+Trước khi đi sâu vào code, chúng ta cần hiểu vai trò của từng thành phần trong bộ ba này:
 
-*   **Vấn đề:** Appium mô phỏng hành vi của người dùng trên thiết bị ảo/thực và tương tác với giao diện (UI). Khi Appium gọi API để lấy dữ liệu hiển thị lên UI đó, nó đang phụ thuộc vào mạng lưới.
-*   **Giải pháp Mocking:** Thay vì để Appium thực hiện các lệnh `driver.findElement()` sau đó gọi `restTemplate.get("real-api")`, chúng ta sẽ cấu hình toàn bộ luồng giao tiếp mạng (network traffic) chỉ trỏ về một server giả lập (Mock Server).
-*   **WireMock vai trò gì?** WireMock là một HTTP mocking tool mạnh mẽ, giúp chúng ta "ghi đè" (stubbing) hành vi của các endpoint API thực tế. Nó cho phép định nghĩa *chính xác* những yêu cầu nào sẽ được chấp nhận và phản hồi lại bằng *những dữ liệu nào*.
+1.  **Appium:** Là công cụ điều khiển trình duyệt/thiết bị di động. Nó mô phỏng hành vi người dùng (click, scroll, nhập liệu) và chịu trách nhiệm gọi các API backend.
+2.  **Mobile App Under Test:** Ứng dụng chúng ta muốn kiểm tra. Thay vì trỏ đến `api.production.com`, chúng ta sẽ cấu hình nó để trỏ đến địa chỉ Mock Server của mình (ví dụ: `http://localhost:8080/mock`).
+3.  **WireMock:** Là trái tim của giải pháp. Nó là một HTTP mocking tool mạnh mẽ, cho phép chúng ta mô phỏng các API backend phức tạp một cách có kiểm soát tuyệt đối.
 
-Sự kết hợp này đảm bảo rằng: **Appium chỉ cần quan tâm đến việc tương tác với giao diện người dùng, còn WireMock lo toàn bộ trách nhiệm của việc giả lập logic backend.**
+**Mục tiêu tối thượng:** Tách biệt hoàn toàn khía cạnh giao diện người dùng (Front-end/Mobile Client) khỏi sự biến động của Backend (API Server). Điều này đảm bảo rằng nếu lỗi xảy ra, chúng ta biết chắc chắn 100% là do Mobile App hay là do giả lập API.
 
-## II. Kiến trúc hoạt động (How it Works)
+## 🧱 Phần II: Tại sao lại chọn WireMock? (The Advanced Edge)
 
-Về cơ bản, luồng kiểm thử sẽ diễn ra như sau:
+Nhiều người có thể nghĩ rằng chỉ cần dùng `json-server` hoặc file stub đơn giản là đủ. Tuy nhiên, trong vai trò QE Lead, tôi khuyên bạn nên dùng WireMock vì những tính năng sau mà các công cụ cơ bản không hỗ trợ:
 
-1.  **Cấu hình:** Thiết lập một server WireMock chạy trên một port cục bộ (ví dụ: `http://localhost:8080`).
-2.  **Stubbing:** Khánh Đỗ định nghĩa các stub rules trong WireMock: "Nếu có yêu cầu POST đến `/api/v1/user/login` với body là `{username: 'test', password: '123'}` thì hãy trả về HTTP 200 và JSON response chứa `{"status": "success", "token": "mock_jwt_token"}`."
-3.  **Client App:** Điều chỉnh cấu hình của Mobile App (trong môi trường test) để nó sử dụng base URL của WireMock thay vì API thật.
-4.  **Execution:** Appium chạy script. Khi Appium thực hiện hành động và trigger cuộc gọi mạng, yêu cầu sẽ bị **WireMock Intercept**.
-5.  **Validation:** WireMock kiểm tra request (headers, body, method) và trả về response đã được định nghĩa sẵn.
+1.  **Request Matching (Khớp yêu cầu nâng cao):** WireMock cho phép bạn khớp yêu cầu dựa trên nhiều tiêu chí phức tạp:
+    *   HTTP Method (GET/POST).
+    *   URI Path (`/api/user/**`).
+    *   Headers (Yêu cầu phải có `Authorization` header với giá trị cụ thể).
+    *   Body Content (Sử dụng Regular Expressions để kiểm tra nội dung JSON gửi lên).
+2.  **State Simulation:** Nó cho phép bạn mô phỏng các trạng thái phức tạp, ví dụ: yêu cầu thứ nhất thành công, yêu cầu thứ hai thất bại do tài khoản đã bị khóa.
+3.  **Error Simulation:** Không chỉ là trả về dữ liệu 200 OK. Bạn có thể chủ động kích hoạt lỗi mạng (Network failure) hoặc các mã trạng thái HTTP không mong muốn (401 Unauthorized, 503 Service Unavailable) để kiểm tra tính năng xử lý lỗi của ứng dụng di động.
 
-## III. Hướng dẫn Thực hành Chuyên sâu với Code Example
+## 🛠️ Phần III: Hướng Dẫn Triển Khai Thực Tế (Implementation Deep Dive)
 
-Chúng ta sẽ xem xét kịch bản: Kiểm thử quy trình đăng nhập người dùng và xử lý lỗi API.
+Chúng ta sẽ giả định kịch bản sau: Người dùng cần đăng nhập bằng API `/api/v1/login` và nếu thành công, Appium sẽ kiểm tra xem token có hợp lệ hay không.
 
-### Bước 1: Thiết lập WireMock (The Stubbing Phase)
+### Bước 1: Cài đặt WireMock Server
 
-Chúng ta không chỉ cần stub response thành công, chúng ta cần kiểm soát *mọi* trạng thái. Chúng ta thường sử dụng file JSON hoặc Kotlin/Java để định nghĩa các stubs.
+Bạn nên sử dụng các thư viện client của WireMock (ví dụ: `wiremock-standalone` hoặc tích hợp trong Maven/Gradle).
 
-**Ví dụ 1: Stub Thành Công (Success State)**
-Đây là cấu hình cho một request POST hợp lệ và phản hồi token thành công.
+**Mục đích:** Khởi động server mock trên một cổng cụ thể (ví dụ: 8080) và định nghĩa các *Stub* API.
 
-```json
-// WireMock Stubs for successful login
-{
-  "request": {
-    "method": "POST",
-    "url": "/api/v1/login-mock" 
-  },
-  "response": {
-    "status": 200,
-    "body": "{\"success\": true, \"user_id\": 456, \"token\": \"MOCK_JWT_TOKEN\"}",
-    "headers": {
-      "Content-Type": "application/json"
-    }
-  },
-  // Quan trọng: WireMock có thể thêm các bộ lọc để chỉ khớp với payload cụ thể
-  "matchingRules": [
-    {"field": "body", "equals": "{\"username\":\"testuser\",\"password\":\"correctpass\"}"} 
-  ]
-}
-```
+### Bước 2: Thiết lập Stub cho Kịch bản Thành công (Happy Path)
 
-**Ví dụ 2: Mô phỏng lỗi API (Failure State - Advanced)**
-Đây là phần nâng cao nhất. Thay vì để ứng dụng bị crash khi backend trả về 500, chúng ta buộc nó phải nhận 500 từ Mock Server. Điều này giúp kiểm tra luồng xử lý lỗi UI/UX của mình mà không cần server thật hoạt động.
+Chúng ta cần thiết lập kịch bản khi yêu cầu đăng nhập là hợp lệ.
 
-```json
-// WireMock Stubs for authentication failure (401 Unauthorized)
-{
-  "request": {
-    "method": "POST",
-    "url": "/api/v1/login-mock" 
-  },
-  "response": {
-    "status": 401, // Trả về mã trạng thái lỗi
-    "body": "{\"success\": false, \"error_code\": \"INVALID_CREDENTIALS\", \"message\": \"Tên đăng nhập hoặc mật khẩu không chính xác.\"}",
-    "headers": {"Content-Type": "application/json"}
-  }
-}
-```
-
-### Bước 2: Tích hợp với Appium (The Execution Phase)
-
-Chúng ta phải đảm bảo rằng Mobile App của chúng ta được cấu hình để giao tiếp với WireMock Server. Điều này thường yêu cầu thay đổi các biến môi trường hoặc file `config.json` trong quá trình build test.
-
-**Trong Code Test Script (Java/Python Pseudocode):**
+*(Giả sử bạn đang dùng Java/JVM để quản lý test setup)*
 
 ```java
-// Thiết lập Mock Server trước khi chạy test case
-setupWireMock(true); // Khởi động WireMock trên port 8080 và tải các stubs
-driver.manage().deleteAllRecords();
+// Định nghĩa Stub trước khi Appium chạy
+stubFor(post("/api/v1/login")
+    .withHeader("Content-Type", containing("application/json"))
+    .body(containing("\"username\": \"testuser\"")) // Match body content
+    .willReturn(aResponse()
+        .withStatus(200)
+        .withHeader("Content-Type", "application/json")
+        // Trả về payload JSON giả lập của API thành công
+        .withBody("{\"status\": \"success\", \"token\": \"jwt_mock_token_123\"}"))); 
 
-try {
-    // 1. Appium tự động điều hướng đến màn hình Login (qua UI)
-    LoginPage loginPage = new LoginPage(driver);
-    loginPage.enterCredentials("testuser", "correctpass");
-    loginPage.clickLoginButton(); // Hành động này sẽ trigger cuộc gọi POST tới WireMock
-
-    // 2. Appium chờ kết quả, lấy token từ màn hình sau khi đăng nhập thành công (dựa trên mock data)
-    String token = driver.findElement(By.id("user_token")).getText(); 
-    Assert.assertTrue(token.contains("MOCK_JWT_TOKEN")); // Xác nhận dữ liệu mô phỏng đúng
-
-} finally {
-    // Đảm bảo tắt WireMock sau khi hoàn tất test
-    teardownWireMock();
-}
-
-// Ví dụ Test Failure Case (kiểm tra hiển thị popup lỗi)
-public void testInvalidLoginFlow() {
-    // Buộc gọi API fail trước khi chạy Appium action
-    stubFailureCase(401); 
-    
-    driver.findElement(By.id("username")).sendKeys("baduser");
-    driver.findElement(By.id("password")).sendKeys("wrongpass");
-    driver.findElement(By.id("login_button")).click();
-
-    // Kiểm tra xem UI có hiển thị thông báo lỗi do WireMock cung cấp không.
-    String errorPopup = driver.findElement(By.xpath("//android:text[@resource-id='error_message']")).getText();
-    Assert.assertEquals("Tên đăng nhập hoặc mật khẩu không chính xác.", errorPopup);
-}
+// Explanation từ Khánh Đỗ:
+// - .post("/api/v1/login"): Xác định phương thức và endpoint cần mock.
+// - .withHeader(...) & .body(containing(...)): Đây là phần quan trọng nhất. Nó đảm bảo rằng stub chỉ được kích hoạt khi yêu cầu đến Mock Server khớp chính xác với các điều kiện này (ví dụ: Content-Type phải là JSON, và request body PHẢI chứa key "username").
+// - .withBody("..."): Payload trả về mô phỏng phản hồi thực tế của API. Bằng cách kiểm soát response status và payload, chúng ta kiểm tra mọi hành vi phụ thuộc vào API này.
 ```
 
+### Bước 3: Thiết lập Stub cho Kịch bản Thất bại (Negative Path)
+
+Giả sử người dùng nhập sai mật khẩu. Thay vì để Appium bị treo chờ timeout của Backend thật, WireMock sẽ ngay lập tức trả về lỗi 401.
+
+```java
+// Định nghĩa stub cho trường hợp đăng nhập thất bại
+stubFor(post("/api/v1/login")
+    .withHeader("Content-Type", containing("application/json"))
+    .body(containing("\"username\": \"failuser\"")) // Sử dụng một username khác để tránh xung đột với test case 1
+    .willReturn(aResponse()
+        .withStatus(401) // Trả về mã lỗi Unauthorized
+        .withHeader("Content-Type", "application/json")
+        .withBody("{\"error\": \"Invalid credentials\", \"code\": 401}")));
+
+// Explanation từ Khánh Đỗ:
+// Bằng cách thiết lập trạng thái 401, chúng ta buộc Mobile App phải chạy luồng xử lý lỗi (Error Handling Flow). Chúng ta có thể kiểm tra bằng Appium rằng khi nhận được status 401, ứng dụng đã hiển thị thông báo "Sai mật khẩu" và không bị crash.
+```
+
+### Bước 4: Tích hợp với Appium (The Execution)
+
+Trong test suite của bạn (ví dụ: TestNG/JUnit), bạn phải đảm bảo rằng Appium Driver được cấu hình để trỏ đến địa chỉ Mock Server thay vì API thật.
+
+**Cấu hình cơ bản:**
+
+| Biến môi trường | Giá trị thực tế | Giá trị Mocking |
+| :--- | :--- | :--- |
+| `BASE_API_URL` | `https://backend-production.com/api` | **`http://localhost:8080/api`** |
+
+Trong code Appium, mọi hành vi người dùng sẽ xảy ra bình thường (input data, click button), nhưng khi ứng dụng thực hiện lệnh gọi API nền, nó sẽ gửi yêu cầu đến WireMock Server đang chạy ở background.
+
+**Quy trình trong Test Case:**
+
+1.  **Setup Phase:** Khởi động Appium và WireMock Server.
+2.  **Stubbing Phase:** Triển khai tất cả các `stubFor()` cần thiết cho kịch bản test hiện tại (ví dụ: Stub Success, Stub Fail).
+3.  **Execution Phase:** Chạy các hành động trên Appium (`driver.findElement().click()`, v.v.).
+4.  **Assertion Phase:** Kiểm tra giao diện người dùng và trạng thái hệ thống theo luồng đã được Mock Server kiểm soát.
+
+## 🚀 Phần IV: Các Kỹ thuật Nâng cao cho QE Lead
+
+Nếu bạn muốn nâng cấp khả năng của mình lên mức chuyên gia, hãy nghiên cứu các kỹ thuật sau khi sử dụng WireMock:
+
+### 1. Mô phỏng Độ trễ (Latency Simulation)
+Bạn có thể mô phỏng tình trạng mạng chậm bằng cách thêm tiêu đề `Delay` vào phản hồi của Mock Server.
+
+```java
+// Giả lập API bị treo trong 3 giây do kết nối mạng kém
+.willReturn(aResponse()
+    .withStatus(200)
+    .withBody("...")
+    .withFixedDelay(3000)); // Thêm độ trễ 3000ms (3 giây)
+
+// Lợi ích: Bạn có thể kiểm tra xem Mobile App của mình xử lý timeout tốt như thế nào, thay vì phải chờ đợi thời gian thực không xác định.
+```
+
+### 2. Kiểm thử Dữ liệu Biên (Boundary Testing with State)
+Thay vì chỉ kiểm tra một trạng thái thành công duy nhất, hãy sử dụng WireMock để mô phỏng chuỗi sự kiện:
+
+*   **Test Case:** Người dùng xem sản phẩm $\rightarrow$ Thêm vào giỏ hàng $\rightarrow$ Đến thanh toán.
+*   **WireMock Setup:**
+    1.  Thiết lập `/api/products/{id}` trả về dữ liệu OK (Lần 1).
+    2.  Thiết lập `/api/cart/add` trả về success kèm theo `user_state_id=XYZ`.
+    3.  Sau đó, thay đổi stub cho `/api/inventory/check` để nó chỉ thành công nếu nó nhận được `user_state_id=XYZ` trong header (hoặc body).
+
+Điều này giúp bạn mô phỏng các luồng nghiệp vụ phức tạp và đảm bảo tính toàn vẹn của dữ liệu giữa các bước test.
+
+## 📜 Kết Luận: Tối đa hóa Độ tin cậy Kiểm thử
+
+Việc thiết lập Mock Server nâng cao bằng WireMock không chỉ là một thủ thuật kỹ thuật; đó là việc áp dụng tư duy chất lượng (Quality Mindset) vào tự động hóa kiểm thử.
+
+Khi bạn làm chủ được khả năng giả lập môi trường API backend, bạn đã loại bỏ đi biến số lớn nhất trong Mobile E2E Testing: **sự không ổn định của hệ thống phụ thuộc.**
+
+Kết quả là một bộ test Suite cực kỳ nhanh, mạnh mẽ, và quan trọng nhất – **đáng tin cậy**. Hãy áp dụng WireMock ngay hôm nay để nâng tầm chất lượng đội ngũ QA của bạn!
+
 ***
-
-## IV. Các Chiến lược Nâng cao (Advanced Techniques)
-
-Để nâng cấp quy trình kiểm thử của bạn từ mức cơ bản lên mức chuyên gia, hãy cân nhắc các chiến lược sau:
-
-### 1. Giả lập độ trễ mạng và timeout (Simulating Latency & Timeout)
-Khi backend bị chậm do tải nặng, ứng dụng cần phải hiển thị trạng thái Loading/Spinner một cách mượt mà, thay vì đứng hình hoặc báo lỗi không rõ nguyên nhân. WireMock cho phép bạn mô phỏng điều này:
-
-*   **Cách làm:** Sử dụng tính năng `fixedDelay` trong WireMock stubbing.
-*   **Lợi ích:** Test ability of the UI to handle asynchronous operations gracefully.
-
-### 2. Kiểm thử theo trạng thái (Stateful Testing)
-Trong các quy trình phức tạp, API thứ hai thường yêu cầu một trường dữ liệu được tạo ra từ API thứ nhất (ví dụ: Tạo Order -> Lấy ID Order đó để cập nhật Shipment). WireMock giúp bạn quản lý luồng này:
-
-*   **Cách làm:** Sử dụng khả năng **Persistence** của WireMock hoặc các cơ chế *Context Variables* trong thư viện testing của bạn để lưu trữ giá trị trả về (ví dụ: `user_id`) và sử dụng nó làm tham số yêu cầu cho API stub tiếp theo.
-*   **Lợi ích:** Mô phỏng chính xác End-to-End flow mà không cần phụ thuộc vào database thật.
-
-### 3. Kiểm tra Schema Validation nghiêm ngặt
-Đôi khi, lỗi xảy ra không phải vì server crash, mà chỉ vì schema dữ liệu thay đổi (ví dụ: tên trường `user_id` thành `userId`).
-
-*   **Cách làm:** Định nghĩa các stub với cấu trúc JSON/XML cực kỳ chặt chẽ. Nếu backend thực tế trả về một kiểu dữ liệu sai lệch (ví dụ: chuỗi thay vì số nguyên), bạn có thể lập trình kiểm tra việc này trong môi trường staging và sử dụng WireMock để mô phỏng chính xác "kết quả hỏng" đó cho mục đích test client-side validation.
-
-## V. Kết luận
-
-Sử dụng Mock Server với WireMock kết hợp Appium không chỉ là một *cách làm* mà còn là một **triết lý kiểm thử** nhằm đạt được tính ổn định tuyệt đối (absolute stability) trong các bộ test tự động.
-
-Bằng việc cô lập ứng dụng di động của bạn khỏi sự biến động của backend, chúng ta tối ưu hóa:
-1.  **Tốc độ Test:** Không phải chờ đợi phản hồi chậm từ server thật.
-2.  **Khả năng tái tạo (Repeatability):** Các test case luôn chạy với cùng một kết quả dự kiến.
-3.  **Phạm vi bao phủ:** Chúng ta có thể chủ động buộc ứng dụng xử lý mọi trường hợp lỗi hiếm gặp nhất (như mạng mất kết nối, API 500, hoặc dữ liệu null) mà không cần phải đợi các nhà phát triển fix server trước.
-
-Đây là một khoản đầu tư lớn về thời gian thiết lập ban đầu, nhưng nó sẽ giúp đội ngũ QA của bạn tiết kiệm hàng trăm giờ debug và dramatically tăng độ tin cậy (confidence level) cho sản phẩm cuối cùng.
-
-Chúc các đồng nghiệp thành công trong hành trình xây dựng các bộ test tự động mạnh mẽ!
-
-**— Khánh Đỗ —**
+*Khánh Đỗ - QE Lead.*
