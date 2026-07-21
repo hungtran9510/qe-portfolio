@@ -1,7 +1,7 @@
 ---
 title: "Xây dựng Framework Kiểm thử API tự động với Supertest, Mocha và Chai"
-date: 2026-07-02
-description: "Hướng dẫn chuyên sâu cách thiết lập một framework kiểm thử API robust, hiệu quả bằng bộ công cụ Supertest, Mocha và Chai trong Node.js."
+date: 2026-07-03
+description: "Hướng dẫn chuyên sâu từ góc nhìn của QE Lead về cách xây dựng framework kiểm thử API robust, đáng tin cậy bằng Supertest, Mocha và Chai trên Node.js."
 tags: ["API Testing","Node.js","Automation"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Hùng Trần"
@@ -9,163 +9,191 @@ author: "Hùng Trần"
 
 # Xây dựng Framework Kiểm thử API tự động với Supertest, Mocha và Chai
 
-Chào các đồng nghiệp trong lĩnh vực Chất lượng phần mềm! Tôi là Hùng Trần.
+Chào các đồng nghiệp QA/QE. Tôi là Hùng Trần.
 
-Trong kỷ nguyên Microservices và kiến trúc API là xương sống của mọi sản phẩm số hiện đại, việc đảm bảo tính ổn định, hiệu năng và độ chính xác của các giao diện lập trình ứng dụng (API) đã trở thành yêu cầu tối thượng của chất lượng sản phẩm. Kiểm thử thủ công không chỉ tốn thời gian mà còn dễ bị bỏ sót lỗi ở những luồng nghiệp vụ phức tạp.
+Trong kỷ nguyên mà hầu hết các ứng dụng hiện đại đều được xây dựng dựa trên kiến trúc Microservices hoặc có lớp giao tiếp cốt lõi qua API (RESTful/GraphQL), việc kiểm thử chất lượng API không chỉ là một bước cần thiết—mà nó là xương sống đảm bảo tính ổn định và khả năng mở rộng của hệ thống.
 
-Vậy giải pháp nào để xây dựng một hệ thống kiểm thử API tự động, vừa mạnh mẽ, lại vừa dễ bảo trì? Hôm nay, chúng ta sẽ đi sâu vào việc xây dựng framework này bằng bộ công cụ quen thuộc nhưng vô cùng quyền năng: **Supertest, Mocha và Chai**.
+Tôi nhận thấy nhiều đội ngũ vẫn mắc kẹt ở khâu kiểm thử thủ công hoặc sử dụng các tool mang tính "ghi lại" (Record-and-playback), dẫn đến framework kém linh hoạt, khó bảo trì và đặc biệt là dễ bị lỗi thời khi logic nghiệp vụ thay đổi.
 
-Hãy bắt đầu nhé.
+Bài viết hôm nay sẽ không chỉ dừng lại ở việc *giới thiệu* một bộ công cụ; tôi sẽ hướng dẫn bạn cách *xây dựng* một Framework Kiểm thử API hoàn chỉnh, mạnh mẽ và có khả năng mở rộng cao bằng bộ ba tiêu chuẩn vàng trong hệ sinh thái Node.js: **Supertest**, **Mocha** và **Chai**.
 
-***
+---
 
-## 🛠️ I. Tổng quan về Bộ Công Cụ (The Tech Stack)
+## 💡 I. Hiểu Rõ Bộ Ba Công Cụ (The Synergy)
 
-Trước khi viết code, điều quan trọng là chúng ta phải hiểu vai trò của từng thành phần. Ba thư viện này khi kết hợp lại tạo ra một hệ sinh thái kiểm thử hoàn hảo cho Node.js:
+Trước khi đi sâu vào code, chúng ta cần hiểu vai trò riêng biệt nhưng cực kỳ ăn khớp của ba thư viện này. Việc hiểu được "tại sao" sẽ giúp bạn tối ưu hóa và mở rộng framework một cách khoa học.
 
-### 1. Mocha (Test Runner Framework)
-**Vai trò:** Là "bộ điều phối" hay Test Runner. Nó cung cấp cấu trúc để chúng ta định nghĩa các bộ test (`describe`) và các ca kiểm thử cụ thể (`it`).
-**Tại sao chọn nó?** Mocha rất linh hoạt, không áp đặt cách viết code kiểm thử mà chỉ quan tâm đến việc *chạy* và *báo cáo* kết quả.
+### 1. Mocha: Bộ Trình Hợp Phẩm (The Runner)
+*   **Vai trò:** Mocha là một *test runner*. Nó không kiểm tra logic nào cả, nhiệm vụ duy nhất của nó là cung cấp cấu trúc (structure) để chạy các bài test và báo cáo kết quả.
+*   **Tính năng cốt lõi:** Hỗ trợ cú pháp nhóm (describe), trường hợp test (it/specify). Đây là bộ xương cho toàn bộ framework.
 
-### 2. Chai (Assertion Library)
-**Vai trò:** Là thư viện khẳng định giá trị (Assertion). Sau khi Supertest thực hiện request và nhận về response, chúng ta cần một công cụ để kiểm tra xem `response.status` có phải là 200 không, hay body trả về có chứa trường dữ liệu mong muốn không. Chai chính là thứ cung cấp các cú pháp mạnh mẽ như `expect`, `should`, hay `assert`.
-**Tại sao chọn nó?** Nó cho phép chúng ta viết code kiểm thử theo phong cách Behavior-Driven Development (BDD), giúp test case rất dễ đọc và hiểu (ví dụ: `expect(user.name).to.be.a('string')`).
+### 2. Chai: Bộ Công Cụ Khẳng Định (The Asserter)
+*   **Vai trò:** Chai cung cấp các hàm *assertion* (khẳng định). Khi bạn gọi `expect(response.status).to.equal(200)`, thì chính là lúc Chai vào cuộc để so sánh giá trị thực tế với giá trị mong đợi.
+*   **Ưu điểm nổi bật:** Mocha hỗ trợ nhiều kiểu assertion, nhưng **Chai's BDD style (Behavior-Driven Development)** sử dụng `expect` mang lại cú pháp rất dễ đọc, mô phỏng cách viết yêu cầu nghiệp vụ bằng ngôn ngữ tự nhiên.
 
-### 3. Supertest (HTTP Testing Utility)
-**Vai trò:** Đây là linh hồn của việc kiểm thử API. Supertest được thiết kế để mô phỏng các request HTTP một cách cực kỳ hiệu quả, đặc biệt khi làm việc với các framework Node.js như ExpressJS hoặc Koa. Nó cho phép chúng ta thực hiện request mà không cần phải khởi động cả server vật lý—giúp quá trình test nhanh hơn và cô lập hơn.
-**Tại sao chọn nó?** Supertest giúp tách biệt logic kiểm thử HTTP khỏi phần cấu hình mạng, tập trung tối đa vào việc kiểm tra các Endpoints.
+### 3. Supertest: Bộ Mô Phỏng HTTP Client (The Requester)
+*   **Vai trò:** Đây là thành phần quan trọng nhất trong context của API testing. Thay vì gọi trực tiếp vào lớp service/controller của bạn, Supertest cho phép chúng ta *mô phỏng toàn bộ vòng đời của một request HTTP thực tế*. Nó gửi yêu cầu qua Express app instance (hoặc bất kỳ framework nào nhận diện được) và trả về response object giống hệt như khi nó đến từ mạng thật.
+*   **Tại sao lại dùng Supertest?** Nó tách biệt logic test khỏi việc triển khai server vật lý, giúp quá trình unit/integration test nhanh hơn, cô lập hơn và cực kỳ ổn định.
 
-***
+---
 
 ## ⚙️ II. Thiết Lập Môi Trường (Setup)
 
-Giả sử bạn đã có một project Node.js và có ứng dụng API cơ bản chạy trên ExpressJS. Chúng ta cần cài đặt các dependencies:
+Chúng ta giả định rằng bạn đã có một project Node.js cơ bản. Các bước cài đặt dependencies cần thiết như sau:
 
 ```bash
-# Cài đặt các thư viện kiểm thử
-npm install mocha chai supertest --save-dev
+# Khởi tạo package.json nếu chưa có
+npm init -y
 
-# Khởi tạo cấu hình script trong package.json
-# Ví dụ: "test": "mocha tests/apiTest.js" 
+# Cài đặt các thư viện kiểm thử và runtime
+npm install mocha chai supertest express --save-dev
 ```
 
-***
+***Lưu ý từ Hùng Trần:** Chúng ta cài `express` ở đây không phải để chạy server, mà chỉ là một middleware mẫu cho Supertest biết rằng nó cần đối tượng ứng dụng nào để thực hiện các yêu cầu mô phỏng.*
 
-## 🚀 III. Triển Khai Framework Kiểm Thử (Implementation)
+### Cấu Trúc Dự Án Mẫu:
+```
+/api-project
+├── src/         # Nơi chứa logic backend của bạn (ví dụ: routes, controllers)
+├── test/
+│   └── api.test.js  # Files kiểm thử của chúng ta sẽ đặt ở đây
+├── package.json
+```
 
-Chúng ta sẽ viết một file kiểm thử (`tests/user.test.js`) để mô phỏng các nghiệp vụ liên quan đến người dùng (User Management API).
+---
 
-**Giả sử cấu trúc ứng dụng của bạn:**
-*   `app.js`: Instance ExpressJS đã được cấu hình middleware và routes.
-*   Endpoint: `POST /api/users`, `GET /api/users/:id`.
+## 🚀 III. Triển Khai Framework Kiểm Thử Thực Tế
 
-**File minh họa: `tests/user.test.js`**
+Bây giờ, hãy cùng đi vào phần thực hành. Chúng ta sẽ xây dựng một test case kiểm tra endpoint lấy danh sách người dùng (`GET /api/users`).
+
+### Bước 1: Chuẩn Bị Endpoint Giả Lập (App Instance)
+
+Để Supertest hoạt động, chúng ta cần một đối tượng ứng dụng Express đã được cấu hình để lắng nghe các request. Trong thực tế, bạn sẽ import service/app instance của mình vào đây.
+
+**`test/api.test.js`:**
+```javascript
+const request = require('supertest');
+const express = require('express');
+
+// ----------------------------------------------------
+// Đây là nơi chúng ta tạo ra một ứng dụng Express giả lập
+// Tương tự như việc import app instance của bạn từ backend service
+const app = express();
+app.use(express.json());
+
+// Giả lập route endpoint getUsers
+// Trong thực tế, đây sẽ là logic router thật sự của bạn
+app.get('/api/users', (req, res) => {
+    res.status(200).json([
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' }
+    ]);
+});
+
+module.exports = app; // Export ứng dụng để Supertest sử dụng
+// ----------------------------------------------------
+```
+
+### Bước 2: Viết Test Case Hoàn Chỉnh
+
+Đây là nơi sự kết hợp giữa Mocha, Supertest và Chai tỏa sáng.
+
+**`test/api.test.js` (Tiếp tục file trên):**
+
+*(Chúng ta sẽ dùng `require('./path/to/app')` để đảm bảo đối tượng `app` đã được export.)*
 
 ```javascript
-// 1. Import các thư viện cần thiết
-const request = require('supertest'); // Để thực hiện HTTP request mô phỏng
-const expect = require('chai').expect; // Sử dụng Expect style của Chai
-const app = require('../app'); // Giả định đây là instance ExpressJS đã được khởi tạo
+const request = require('supertest');
+const { expect } = require('chai'); 
+// Lấy object 'expect' từ chai cho cú pháp BDD.
 
-// 2. Định nghĩa Context Test Suite bằng Mocha's describe
-describe('User API Testing Suite', () => {
-    
-    let testUserData; // Biến lưu trữ dữ liệu kiểm thử (Test Fixture)
+describe('API User Management - GET /api/users', () => {
+    let app; // Khai báo biến ứng dụng để sử dụng trong các test case
 
-    // Hook: Thiết lập trước khi chạy bộ test này
-    before(() => {
-        console.log("--- Bắt đầu thiết lập môi trường User API ---");
-        // Giả định ta cần một user có sẵn để dùng cho các test sau
-        testUserData = { name: "John Doe", email: "john@example.com", password: "securepassword123" };
+    // Sử dụng hook beforeEach: Thiết lập môi trường trước khi chạy mỗi nhóm kiểm thử (describe)
+    before(async function() {
+        app = require('../test/api.test'); 
     });
 
-    // Hook: Dọn dẹp sau khi bộ test hoàn tất (ví dụ: xóa dữ liệu)
-    after(() => {
-        console.log("--- Hoàn thành kiểm thử API ---");
-        // Ở thực tế, ở đây ta sẽ gọi một endpoint DELETE để reset trạng thái DB
-    });
 
-    // ----------------------- TEST CASE 1: POST /api/users (Tạo User) -----------------------
-    it('should successfully create a new user and return status 201', async () => {
+    it('Should return status 200 OK and a list of users', async () => {
+        // Sử dụng Supertest để mô phỏng request GET
         const response = await request(app)
-            .post('/api/users') // Supertest gọi đến app instance
-            .send(testUserData);
+            .get('/api/users') // Endpoint cần test
+            .set('Accept', 'application/json'); // Mô phỏng header chấp nhận
 
-        // Khẳng định 1: Kiểm tra Status Code
-        expect(response.statusCode).to.equal(201); 
-        
-        // Khẳng định 2: Kiểm tra cấu trúc dữ liệu (Body)
-        expect(response.body).to.have.property('id');
-        expect(response.body).to.have.property('name').that.equals(testUserData.name);
+        // --------------------------------------
+        // *** Bắt đầu phần Assertion với Chai (Expect) ***
+        // 1. Kiểm tra status code: response.statusCode là thuộc tính được Supertest gắn vào
+        expect(response.statusCode).to.equal(200); 
 
-        return response.body; // Trả về user mới được tạo để dùng cho test GET sau
+        // 2. Kiểm tra Content Type và Body tồn tại
+        expect(response.body).to.be.an('array').with.lengthOf.at.least(1); 
+
+        // 3. Kiểm tra cấu trúc dữ liệu (Schema Validation)
+        const firstUser = response.body[0];
+        expect(firstUser).to.have.property('id').that.is.a('number');
+        expect(firstUser).to.have.property('name').that.is.a('string');
+
     });
 
-    // ----------------------- TEST CASE 2: GET /api/users/:id (Lấy User theo ID) -----------------------
-    it('should fetch the newly created user by ID', async () => {
-        // Sử dụng dữ liệu từ test case trước đó (hoặc mock ID)
-        const userId = "a1b2c3d4"; // Giả sử ta biết ID này
-
+    it('Should handle invalid paths gracefully', async () => {
         const response = await request(app)
-            .get(`/api/users/${userId}`);
+            .get('/api/nonexistent-endpoint');
 
-        // Khẳng định 1: Kiểm tra Status Code khi thành công
-        expect(response.statusCode).to.equal(200);
-        // Khẳng định 2: Kiểm tra sự tồn tại của dữ liệu trả về
-        expect(response.body).to.be.an('object');
+        // Kiểm tra xem việc truy cập sai endpoint có trả về 404 không
+        expect(response.statusCode).to.equal(404);
     });
-
-    // ----------------------- TEST CASE 3: POST /api/users (Xử lý Validation lỗi) -----------------------
-    it('should return 400 Bad Request if required fields are missing', async () => {
-        const invalidData = {}; // Body rỗng
-        
-        const response = await request(app)
-            .post('/api/users')
-            .send(invalidData);
-
-        // Khẳng định: Khi dữ liệu thiếu, status phải là 400
-        expect(response.statusCode).to.equal(400); 
-        // Khẳng định sâu hơn: Kiểm tra thông báo lỗi cụ thể trong body
-        expect(response.body).to.have.property('errors').that.includes('Missing name field');
-    });
-
 });
 ```
 
-### 🔍 Giải thích chi tiết từ Hùng Trần (Phần quan trọng nhất!)
+### Giải Thích Chuyên Sâu Về Code:
 
-1.  **`describe()` và `it()`:** Đây là cách chúng ta định cấu trúc test case theo ngữ nghĩa (Semantics). Khi người đọc code, họ sẽ thấy rõ: "Khi tôi kiểm tra API Người dùng (`User API Testing Suite`), nó phải thành công trong việc tạo user (`should successfully create a new user`)".
-2.  **`before()` và `after()`:** Đây là các **Hooks**. Chúng cực kỳ quan trọng vì chúng giúp ta thiết lập trạng thái (setup) trước khi chạy test, và dọn dẹp (teardown) sau khi test xong. Điều này đảm bảo rằng mỗi test case chạy trong môi trường sạch sẽ, không bị ảnh hưởng bởi kết quả của test case khác.
-3.  **`await request(app).post('/api/users').send(testUserData)`:** Đây là cốt lõi Supertest. Thay vì phải xây dựng một URL và dùng `axios` (cần cấu hình base URL), ta chỉ cần truyền instance Express (`app`). Supertest tự động xử lý việc mô phỏng HTTP cycle: Request $\rightarrow$ Middleware $\rightarrow$ Route Handler $\rightarrow$ Response.
-4.  **`expect(response.statusCode).to.equal(201);`:** Đây là cú pháp của Chai. Nó viết theo phong cách BDD (Behavior-Driven Development), giúp code kiểm thử không chỉ đúng về mặt kỹ thuật mà còn dễ đọc như một yêu cầu nghiệp vụ. Chúng ta khẳng định (assert) rằng trạng thái phải là 201, thay vì chỉ trả về `if (status !== 201) throw Error;`.
-5.  **Sự kết hợp:** Supertest lo việc **gửi request**, Chai lo việc **kiểm tra response**. Mocha lo việc **chạy tuần tự và báo cáo** toàn bộ quá trình.
+1.  **`describe('...', () => { ... })` (Mocha):** Định nghĩa một nhóm các test case liên quan đến cùng một chức năng (User Management API).
+2.  **`before(async function() { ... })` (Hook):** Đây là Best Practice của QE Lead. Hooks (`before`, `after`) đảm bảo rằng môi trường kiểm thử được thiết lập sạch sẽ trước khi bất kỳ bài test nào bắt đầu, ngăn ngừa tình trạng **test contamination**.
+3.  **`it('...', async () => { ... })` (Mocha):** Định nghĩa một trường hợp kiểm thử cụ thể (một kịch bản).
+4.  **`const response = await request(app).get('/api/users').set(...)` (Supertest):** Đây là sự kỳ diệu của Supertest. Nó nhận đối tượng `app`, giả lập hành vi gọi `.get()` lên endpoint `/api/users`, và chờ kết quả trả về dưới dạng promise, giúp chúng ta sử dụng cú pháp `await`.
+5.  **`expect(response.statusCode).to.equal(200)` (Chai):** Đây là logic kiểm tra. Chúng ta khẳng định rằng giá trị `response.statusCode` phải bằng 200. Cú pháp `.to.equal()` của Chai giúp code cực kỳ dễ đọc, mô tả ý đồ kiểm test rõ ràng như thể đang viết Requirement BDD.
 
-***
+---
 
-## ✨ IV. Best Practices của một QE Lead (Nâng cao)
+## ✨ IV. Các Kỹ Thuật Nâng Cao Cho QE Lead (Beyond the Basics)
 
-Để framework này không chỉ chạy được mà còn bền vững, bạn cần tuân thủ các nguyên tắc sau:
+Nếu bạn đã thành thạo việc chạy các test cơ bản trên, hãy chú ý đến những điểm sau để nâng cấp framework của mình lên mức độ Enterprise-Grade:
 
-### 1. Quản lý Dữ liệu Kiểm thử (Data Fixtures Management)
-Không bao giờ hardcode dữ liệu test vào trong file `it()`. Hãy tạo một module riêng (`test/fixtures/user-data.js`) để quản lý các trạng thái người dùng mẫu, sản phẩm mẫu, v.v. Điều này giúp việc thay đổi yêu cầu nghiệp vụ không buộc ta phải sửa hàng chục file test case.
+### 1. Quản Lý Dữ Liệu Giả Lập (Fixtures Management)
+Tuyệt đối không nên hardcode dữ liệu vào test file. Hãy tạo một thư mục `test/fixtures` và sử dụng module I/O để đọc các tập tin JSON hoặc CSV.
 
-### 2. Tách biệt Business Logic (Helper Functions)
-Nếu một luồng kiểm thử phức tạp cần thực hiện nhiều bước (ví dụ: Tạo user $\rightarrow$ Invite user đó $\rightarrow$ Lấy token của user mới), hãy viết các hàm Helper để đóng gói logic này.
+*   **Ví dụ:** Khi bạn cần kiểm tra việc xóa người dùng, hãy lấy ID của user đó từ file fixture thay vì viết `@Given {user_id} 123`. Điều này giúp test tự động cập nhật khi dữ liệu mẫu thay đổi.
 
-*Ví dụ:* Thay vì viết 50 dòng code Supertest, bạn tạo `createAndAuthenticateUser(data)` trả về {userObject, authToken}.
+### 2. Xử Lý Trạng Thái (Test State Management)
+Nếu Test A cần phải tạo một tài nguyên và Test B cần dùng ID của tài nguyên đó, bạn không nên để chúng chạy độc lập. Hãy sử dụng:
 
-### 3. Sử dụng Setup/Teardown ở cấp độ Test Suite
-Như đã minh họa với `before()` và `after()`, luôn sử dụng Hooks để quản lý tài nguyên hệ thống (database connections, cache keys) nhằm đảm bảo **Isolation** (Tính cô lập). Mỗi test case phải chạy như thể nó là lần đầu tiên được thực thi.
+*   **`beforeEach` Hook:** Thiết lập trạng thái cơ bản *trước mỗi test*.
+*   **`afterEach` Hook:** Dọn dẹp trạng thái (Clean up) sau mỗi test. Ví dụ: Sau khi tạo user X, dùng `await request(app).delete('/api/users/' + userId)` để xóa user X. Điều này đảm bảo môi trường sạch sẽ cho kịch bản tiếp theo.
 
-### 4. Tham số hóa Test Cases
-Nếu bạn có một luồng nghiệp vụ cần kiểm tra với nhiều giá trị khác nhau (ví dụ: validation cho các độ dài mật khẩu từ 8 đến 20 ký tự), đừng viết nhiều `it()` case. Hãy sử dụng các hàm như `describe.each` (nếu dùng Jest) hoặc viết vòng lặp trong Mocha/Chai để chạy cùng một logic test với các bộ dữ liệu khác nhau.
+### 3. Tách Logic Test và Assertions (DRY Principle)
+Nếu bạn có nhiều test case cùng kiểm tra việc xác thực JSON Schema, đừng viết code đó lặp lại. Hãy tạo một hàm utility riêng:
 
-***
+```javascript
+// utils/validation.js
+const { expect } = require('chai');
 
-## 🎯 Kết Luận
+function validateSchema(data, schemaMap) {
+    expect(data).to.be.an('object').that.hasAllKeys(Object.keys(schemaMap));
+    // ... logic kiểm tra chi tiết hơn ...
+}
+```
+Sau đó gọi hàm này trong các test case của bạn.
 
-Xây dựng một API Testing Framework tự động không chỉ là việc chọn đúng thư viện, mà quan trọng hơn là hiểu rõ **vai trò tương tác** của từng thành phần: Supertest mô phỏng hành vi HTTP, Mocha định hình cấu trúc test, và Chai cung cấp khả năng khẳng định mạnh mẽ.
+---
 
-Bằng cách áp dụng bộ ba công cụ này cùng với các nguyên tắc thiết kế framework chuyên nghiệp (Hooks, Fixtures), bạn sẽ sở hữu một hệ thống kiểm thử API không chỉ hiệu quả mà còn dễ mở rộng theo sự phát triển của sản phẩm.
+## 🎓 Kết Luận
 
-Chúc các đồng nghiệp luôn duy trì được chất lượng phần mềm xuất sắc! Hùng Trần.
+Việc xây dựng một API Test Framework không chỉ là việc cài đặt các thư viện, mà là thiết lập một *quy trình* kiểm thử có cấu trúc và kỷ luật. Bằng cách kết hợp sức mạnh của Mocha (Cấu trúc), Chai (Assertion) và Supertest (Mocking HTTP Requests), bạn đã trang bị cho mình bộ công cụ đủ tầm để viết ra những bài test không chỉ chạy được, mà còn cực kỳ dễ hiểu, dễ bảo trì, và quan trọng nhất: **đáng tin cậy.**
+
+Lời khuyên cuối cùng từ tôi là: Đừng bao giờ nghĩ rằng việc kiểm thử tự động là một nhiệm vụ "nên có". Hãy xem nó như là tài liệu thiết kế *sống* của sản phẩm bạn đang xây dựng. Nó giúp đội ngũ phát triển và QA hiểu rõ ràng, chính xác điều gì được kỳ vọng ở mỗi API endpoint.
+
+Chúc các bạn thành công trên hành trình nâng cấp chất lượng phần mềm!
+<br>
+**Hùng Trần - QE Lead.**
