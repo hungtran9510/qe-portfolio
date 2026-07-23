@@ -1,203 +1,185 @@
 ---
 title: "Thiết lập Mock Server nâng cao cho Mobile App Testing bằng WireMock và Appium"
-date: 2026-05-15
-description: "Làm chủ Artfact testing: Hướng dẫn chi tiết thiết lập WireMock để mô phỏng API phức tạp, tối ưu hóa kịch bản kiểm thử ứng dụng di động với Appium."
-tags: ["Mobile Testing","Appium","WireMock","API Mocking"]
+date: 2026-05-16
+description: "Hướng dẫn chuyên sâu cách cô lập môi trường kiểm thử di động bằng WireMock và tự động hóa với Appium, tối đa hóa độ tin cậy của test case."
+tags: ["Mobile Testing","Appium","WireMock"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Khánh Đỗ"
 ---
 
 # Thiết lập Mock Server nâng cao cho Mobile App Testing bằng WireMock và Appium
 
-Chào các anh chị em đồng nghiệp đang làm trong lĩnh vực Quality Engineering, tôi là Khánh Đỗ.
+Chào mọi người, tôi là Khánh Đỗ. Trong vai trò một QE Lead (Trưởng nhóm Kỹ thuật Đảm bảo Chất lượng), tôi nhận thấy rằng thách thức lớn nhất khi tự động hóa kiểm thử ứng dụng di động (Mobile App) không phải là viết code Selenium hay Appium, mà chính là **sự phụ thuộc vào môi trường Backend**.
 
-Trong hành trình QA chuyên sâu, chúng ta thường gặp một thách thức lớn khi kiểm thử ứng dụng di động (Mobile App). Ứng dụng của bạn luôn phải giao tiếp với nhiều API backend khác nhau. Trong môi trường Dev hoặc CI/CD cục bộ, việc phụ thuộc vào các dịch vụ backend thực tế (stagin/pre-prod) không chỉ gây chậm trễ mà còn dẫn đến tính kém ổn định khi một service nào đó bị lỗi ngoài luồng kiểm thử của chúng ta.
+Chúng ta thường gặp tình trạng "Flaky Tests" (các bài test thất thường): lúc chạy được, lúc lại fail, và nguyên nhân luôn chỉ về dịch vụ API bên ngoài. Điều này làm chậm chu kỳ CI/CD, gây lãng phí tài nguyên kiểm thử, và tệ hơn là khiến đội ngũ mất niềm tin vào hệ thống tự động hóa của chính mình.
 
-Và đây chính là lúc sự kết hợp giữa **WireMock** và **Appium** trở thành vũ khí tối thượng của người QA chuyên nghiệp. Bài viết này không chỉ dừng lại ở việc "cài đặt"; chúng ta sẽ đi sâu vào cách thiết lập một Mock Server nâng cao để kiểm soát hoàn toàn hành vi mạng, cho phép bạn mô phỏng các kịch bản phức tạp nhất, từ lỗi API đến độ trễ mạng (latency).
+Bài viết này không chỉ dừng lại ở việc giải quyết các test thất thường đơn thuần. Chúng ta sẽ đi sâu vào cách thiết lập một **Môi trường Kiểm thử Cô lập (Isolated Test Environment)** hoàn hảo, sử dụng bộ đôi công cụ cực kỳ mạnh mẽ: **WireMock** và **Appium**.
 
-***
+Nếu bạn đang tìm kiếm sự ổn định tuyệt đối cho các test case End-to-End di động, hãy cùng tôi theo dõi!
 
-## 🧱 I. Nền tảng lý thuyết: Tại sao phải là WireMock?
+---
 
-Trước khi đi vào thực tiễn, hãy hiểu rõ vai trò của Mock Server trong bối cảnh Mobile Testing.
+## 🚀 Phần I. Nắm Bắt Vấn Đề: Tại sao cần Mocking?
 
-**Kiểm thử kiểu Tách biệt (Isolation Testing):** Mục tiêu tối thượng của QA là đảm bảo rằng ứng dụng hoạt động đúng đắn *dù* backend có lỗi hay thay đổi thế nào. Bằng cách sử dụng WireMock, chúng ta tạo ra một lớp giả lập hoàn hảo cho API backend.
+Trước khi đi vào giải pháp kỹ thuật, chúng ta cần hiểu rõ nguyên lý cơ bản: **Mục tiêu của Automated Test là kiểm tra logic của ứng dụng (App Logic), chứ không phải kiểm tra sự ổn định của mạng hay Backend.**
 
-### 💡 Tại sao chọn WireMock cụ thể?
+Khi bạn sử dụng một API thực tế (ví dụ: `api.production-backend.com`), các yếu tố bên ngoài như:
+1.  **Tốc độ Backend:** Nếu backend quá tải, test sẽ timeout và fail vì lý do hiệu năng, không phải lỗi logic của app.
+2.  **Trạng thái dữ liệu:** Dữ liệu có thể bị thay đổi bởi các process khác (data race condition).
+3.  **Tính khả dụng:** Downtime là điều không tránh khỏi.
 
-Khác với các mocking đơn giản chỉ trả về mã JSON tĩnh, WireMock (và các công cụ tương tự như Mockito) cung cấp khả năng **kiểm soát luồng và hành vi HTTP** một cách tinh vi:
+**Giải pháp Mocking bằng WireMock:** WireMock đóng vai trò là một "người mô phỏng" API Backend của bạn. Nó hoạt động như một *Proxy Server* chuyên biệt, lắng nghe các yêu cầu HTTP mà ứng dụng di động gửi đến và trả về phản hồi được kiểm soát hoàn toàn (dù là thành công 200 OK với payload dữ liệu giả định, hay lỗi 401 Unauthorized để kiểm tra luồng xử lý error).
 
-1.  **Mapping chính xác:** Định nghĩa các yêu cầu theo phương thức HTTP (GET/POST), path, header, và body request.
-2.  **Response phức tạp:** Trả về không chỉ payload JSON mà còn cả mã trạng thái (HTTP Status Code) mong muốn.
-3.  **Scenario Simulation (Mô phỏng kịch bản):** Đây là điểm mạnh nhất. Bạn có thể thiết lập WireMock để:
-    *   Trả về lỗi 500 Internal Server Error sau lần gọi thứ N.
-    *   Gây ra độ trễ mạng giả (latency) 2 giây.
-    *   Yêu cầu một tham số đầu vào cụ thể trong request body để trả về response khác nhau (Stateful Mocking).
+### 💡 WireMock vs. Stubbing đơn thuần
+*   **Stub:** Chỉ trả về một giá trị cố định bất kể yêu cầu là gì. (Quá đơn giản).
+*   **WireMock:** Mạnh hơn nhiều. Nó cho phép bạn thiết lập các quy tắc khớp request cực kỳ chi tiết (**Request Matching**), bao gồm:
+    *   Phương thức HTTP (`GET`, `POST`).
+    *   URL Endpoint chính xác.
+    *   Header bắt buộc (ví dụ: yêu cầu phải có Bearer Token).
+    *   Giá trị tham số trong Body JSON.
 
-***
+Điều này cho phép chúng ta kiểm thử các trường hợp phức tạp như "Nếu request chứa UserID X, thì trả về dữ liệu A; nhưng nếu chứa Y, thì trả về lỗi B."
 
-## 🛠️ II. Hướng dẫn thiết lập thực tế: WireMock với Appium
+---
 
-Trong bài viết này, chúng ta sẽ giả định kịch bản sau: Người dùng đăng nhập qua Mobile App và API backend của người dùng có thể bị lỗi tạm thời (ví dụ: mã 503) hoặc trả về dữ liệu bị giới hạn (Rate Limit - mã 429). Chúng ta cần kiểm tra cách ứng dụng xử lý các trường hợp này.
+## 🛠️ Phần II. Thiết Lập Môi Trường Tích Hợp (WireMock & Appium)
+
+Giả sử chúng ta có một ứng dụng di động tính năng "Xem chi tiết sản phẩm" (`Product Detail Screen`). Dữ liệu này được lấy qua API call từ endpoint: `GET /api/products/{id}`.
+
+**Flow kiểm thử lý tưởng:**
+1.  Appium khởi chạy Mobile App (Test Case bắt đầu).
+2.  Appium điều hướng đến màn hình Product Detail, và ứng dụng gọi API với Product ID = 123.
+3.  WireMock chặn request này.
+4.  WireMock trả về dữ liệu JSON mô phỏng (Product Name: "Laptop X", Price: "$1500").
+5.  Appium kiểm tra giao diện UI xem nó đã hiển thị đúng Product Name và Price được mock chưa.
+
+Đây là luồng chúng ta sẽ hiện thực hóa bằng code.
 
 ### Bước 1: Thiết lập WireMock Server
 
-Chúng ta nên chạy WireMock trong một container Docker để đảm bảo tính độc lập và dễ tái tạo môi trường testing.
+Chúng ta cần khởi động WireMock trên một cổng khác với backend thật (ví dụ: `http://localhost:8080`). Chúng ta sử dụng JSON files hoặc API để định nghĩa các quy tắc khớp request.
 
-**Ví dụ cấu hình `mappings` (tham chiếu vào file JSON/YAML):**
-
-Giả sử chúng ta muốn mô phỏng API `/api/v1/login`. Chúng ta cần 3 kịch bản: Thành công, Lỗi Server, và Giới hạn Rate Limit.
+**Ví dụ thiết lập cho Product ID = 123:**
+**(Giả sử chúng ta dùng Java/JUnit Runner để khởi chạy WireMock)**
 
 ```json
-// src/test/resources/mappings/user_login_mock.json
+// WireMock Mapping file for /api/products/123
 {
   "request": {
-    "method": "POST",
-    "urlPattern": "/api/v1/login"
+    "method": "GET",
+    "url": "/api/products/123" 
   },
-  "response": [
-    {
-      "status": 200,
-      "body": "{\"token\": \"valid-jwt\", \"user_id\": 1}",
-      "headers": {
-        "Content-Type": "application/json"
-      }
-    },
-    {
-      // Kịch bản lỗi server (503)
-      "status": 503,
-      "body": "{\"error\": \"Service Unavailable. Please try again later.\"}"
-    },
-    {
-      // Kịch bản rate limit (429)
-      "status": 429,
-      "body": "{\"error\": \"Rate Limit Exceeded.\", \"retry_after_seconds\": 60}"
+  "response": {
+    "status": 200,
+    "body": "{\"id\": 123, \"name\": \"Smart TV Model Z\", \"price\": 1500.00}",
+    "headers": {
+      "Content-Type": "application/json"
     }
+  },
+  "matchingRules": [
+    // Quy tắc này đảm bảo chỉ trả lời khi request chứa Bearer Token hợp lệ (Nâng cao)
+    {"header": "Authorization", "equalTo": "Bearer valid-token"} 
   ]
 }
 ```
 
-### Bước 2: Tích hợp WireMock vào Test Framework (JUnit/TestNG)
+**Giải thích của Khánh Đỗ:**
+*   Phần `request` định nghĩa chính xác những gì chúng ta mong đợi: Phương thức GET và endpoint `/api/products/123`.
+*   Phần `response` là payload mà WireMock sẽ gửi về. Quan trọng nhất, hãy lưu ý việc sử dụng **Status 200**. Nếu muốn kiểm thử luồng lỗi API (ví dụ: Network Error), chúng ta có thể cấu hình WireMock trả về Status 503 hoặc thậm chí dùng các logic để làm timeout request.
+*   Phần `matchingRules` là điểm nâng cao. Nó cho phép test case của bạn không chỉ kiểm tra xem app gọi đúng URL, mà còn phải gửi kèm theo header (như token) *theo định dạng chính xác*.
 
-Trong môi trường Java (thường đi kèm với Appium), chúng ta sử dụng các thư viện như `WireMock JUnit Rule` để khởi tạo và quản lý vòng đời của Server.
+### Bước 2: Cấu hình Appium Client và Test Script
 
-**Mã giả lập quy trình Mocking:**
+Thay vì để ứng dụng di động kết nối tới `https://api.live-backend.com`, chúng ta buộc nó phải trỏ đến Mock Server của mình: `http://localhost:8080`.
 
-```java
-// Class: LoginAPIMockRule.java
-public class LoginAPIMockRule {
-    @Rule
-    public WireMockRule wiremock = new WireMockRule(
-        wireMockUrl("http://localhost:8080"), 
-        Options.options()
-            .port(8080) // Đảm bảo port nhất quán với Appium config
-            .build()
-    );
+**Cấu trúc Code (Ví dụ sử dụng Python/Java cho Appium và ngôn ngữ kiểm thử):**
 
-    @BeforeMethod
-    public void setupMocks() {
-        // Xóa sạch các mapping cũ trước mỗi lần chạy test
-        wiremock.reset(); 
-        
-        // Thiết lập 1: Kịch bản thành công (Dành cho testcase "Happy Path")
-        stubFor(post(urlEqualTo("/api/v1/login"))
-                .withRequestBodyContaining("testuser")
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"token\": \"valid-jwt\", \"user_id\": 1}"))).inScenario("Login Flow");
+```python
+# appium_test_script.py
 
-        // Thiết lập 2: Kịch bản lỗi (Dành cho testcase "Failure Path")
-        stubFor(post(urlEqualTo("/api/v1/login"))
-                .withRequestBodyContaining("badpass") // Chỉ kích hoạt khi user nhập mật khẩu sai
-                .willReturn(aResponse()
-                        .withStatus(401)
-                        .withBody("{\"error\": \"Invalid credentials\"}")));
+from appium import webdriver
+import time
+
+def run_product_detail_test():
+    # 1. Khởi tạo driver Appium
+    # Lưu ý: Cấu hình remote-device phải trỏ đến Mock Server của ta!
+    desired_capabilities = {
+        'platformName': 'Android',
+        'appPackage': 'com.myapp',
+        # Giả định rằng chúng ta đã thiết lập môi trường để App gọi API tại localhost:8080
+        'apiBaseUrlMocked': 'http://localhost:8080/api/products/' 
     }
-}
-```
-
-### Bước 3: Triển khai Appium Test Case sử dụng Mocked API
-
-Bây giờ, chúng ta sẽ kết nối Appium (thực hiện các hành vi người dùng trên thiết bị giả lập/thực) với Server Mock đã được cấu hình.
-
-**Giả định:** Mobile App của bạn khi gọi API, nó sẽ trỏ đến `http://localhost:8080` thay vì backend thật. Điều này phải được thực hiện thông qua việc cấu hình môi trường (Environment Variables) cho Appium Driver.
-
-```java
-// Class: LoginAppTest.java
-@Ignore("Sử dụng Mobile Test Runner")
-public class LoginAppTest {
+    driver = webdriver.Remote('http://localhost:4723/wd/hub', desired_capabilities)
     
-    WebDriver driver = new AppiumDriver(); // Khởi tạo Appium session
-    LoginAPIMockRule mockRules = new LoginAPIMockRule();
+    try:
+        # 2. Appium điều hướng và kích hoạt hành động (Action Trigger)
+        # Ta bấm vào sản phẩm ID 123
+        time.sleep(3) # Cho app load xong màn hình list
 
-    @Test(priority = 1)
-    public void test_successful_login_flow() {
-        // 1. Thao tác trên Appium: Nhập user/pass hợp lệ (kích hoạt stub 200 OK).
-        driver.findElement(By.id("username")).sendKeys("testuser");
-        driver.findElement(By.id("password")).sendKeys("correctpass");
-        driver.findElement(By.id("loginButton")).click();
+        # Tìm element của Product ID 123 và click
+        product_element = driver.find_element_by_id("product-card-123")
+        product_element.click()
+        
+        # 3. Chờ đợi sự thay đổi UI (Kiểm tra kết quả Mock)
+        time.sleep(5) # Thời gian cho App gọi API và xử lý dữ liệu
+        
+        # 4. Assertion (Xác nhận kết quả kiểm thử)
+        # Chúng ta assertion rằng TextView Tên sản phẩm phải chứa giá trị do WireMock cung cấp: "Smart TV Model Z"
+        expected_name = "Smart TV Model Z"
+        actual_name_element = driver.find_element_by_id("product-detail-name")
+        actual_name = actual_name_element.text
 
-        // EXPECTATION: Appium nên đọc được Token và điều hướng đến màn hình Dashboard (API 200 OK)
-        WebElement dashboardElement = waitUntilElementIsVisible(By.id("dashboardHeader"));
-        Assert.assertTrue(dashboardElement.isDisplayed(), "Đăng nhập thành công, phải hiển thị trang Dashboard.");
-    }
+        assert actual_name == expected_name, f"FAIL: Expected '{expected_name}', but got '{actual_name}'"
+        print("\n✅ Test Passed! UI hiển thị chính xác dữ liệu từ Mock Server.")
 
-    @Test(priority = 2)
-    public void test_server_unavailable_handling() {
-        // *** Kỹ thuật nâng cao: Thao túng Mock Server giữa chừng ***
-        mockRules.setMockStatus(503); // Thay đổi mapping ngay trước khi chạy test
 
-        // 1. Thao tác trên Appium: Thực hiện đăng nhập (kích hoạt stub 503).
-        driver.findElement(By.id("loginButton")).click();
+    except AssertionError as e:
+        print(f"\n❌ Test Failed (Logic Error): {e}")
+    except Exception as e:
+        print(f"\n❌ Test Failed (Automation/Network Error): {e}")
+    finally:
+        driver.quit()
 
-        // EXPECTATION: Appium không được báo lỗi API chung, mà phải hiển thị Pop-up "Service Unavailable"
-        WebElement errorPopup = waitUntilElementIsDisplayed(By.id("error_popup"));
-        Assert.assertTrue(errorPopup.getText().contains("Tạm thời mất kết nối"), 
-                              "App phải bắt và hiển thị thông báo lỗi Server đúng cách.");
-    }
-
-    @AfterMethod
-    public void tearDown() {
-        mockRules.resetMock(); // Đặt lại toàn bộ mapping về trạng thái mặc định
-        driver.quit();
-    }
-}
+if __name__ == "__main__":
+    run_product_detail_test()
 ```
 
-***
+**Giải thích của Khánh Đỗ:**
+*   **Kiểm soát luồng:** Sự kỳ diệu ở đây là khi Appium thực hiện `product_element.click()`, hành động này khiến ứng dụng bên dưới tự động gọi API tới Endpoint (mà trong môi trường test, chúng ta đã ép nó trỏ về WireMock).
+*   **Độ tin cậy tuyệt đối:** Chúng ta không cần quan tâm mạng đang ổn định hay Backend có báo lỗi 500 hay không. Khi app gọi request, WireMock sẽ đảm bảo trả về *chính xác* payload JSON mà chúng ta đã thiết lập ở Bước 1, cho phép chúng ta kiểm tra mọi luồng dữ liệu từ giao diện người dùng (UI) một cách nhất quán và lặp lại.
 
-## 🚀 III. Phân tích chuyên sâu và Lời khuyên từ Khánh Đỗ (The QE Lead’s Insights)
+---
 
-Thiết lập Mock Server không chỉ là copy-paste code; nó đòi hỏi tư duy kiểm thử kiến trúc hệ thống. Dưới đây là ba điểm quan trọng mà các QA/QE cần lưu ý:
+## ✨ Phần III. Các Kỹ Thuật Nâng Cao dành cho QE Lead
 
-### 1. Quản lý Trạng thái (State Management) - Tăng cấp từ Test Case sang Scenario Testing
+Để bài test không chỉ ổn định mà còn phải thực sự "Chuyên nghiệp," các bạn cần áp dụng những kỹ thuật sau:
 
-Các API thực tế thường yêu cầu trạng thái: Bạn phải đăng nhập thành công **trước** khi bạn có thể gọi API lấy profile của mình. WireMock cho phép điều này thông qua tính năng `scenarios` và `stateful matching`.
+### 1. Kiểm Thử Theo Trạng Thái (Stateful Mocking)
+Thay vì coi mỗi request là độc lập, hãy mô phỏng một luồng tương tác người dùng nhiều bước (ví dụ: Đăng nhập -> Lấy Token A -> Dùng Token A để gọi API B).
+*   **Kỹ thuật:** Thiết lập WireMock để yêu cầu đầu vào (Header) ở lần gọi thứ hai phải chứa kết quả (Token) được trả về từ lần gọi đầu tiên. Điều này mô phỏng các luồng bảo mật phức tạp như OAuth 2.0 hoặc JWT.
 
-*   **Thực hành:** Thay vì tạo một endpoint `/getProfile` độc lập, hãy cấu hình nó để chỉ trả về 200 OK nếu request body chứa header **Authorization Bearer Token** được lấy thành công từ bước Mocking đăng nhập trước đó. Điều này buộc bạn phải kiểm tra luồng nghiệp vụ (business flow) thay vì chỉ kiểm tra các điểm cuối (endpoints).
+### 2. Mô Phỏng Lỗi Có Chủ Ý (Intentional Failure Simulation)
+Đây là điều quan trọng nhất đối với QE Lead. Một test tốt không chỉ kiểm tra khi mọi thứ hoạt động (Happy Path), mà còn phải kiểm tra:
+*   **Timeout:** Cấu hình WireMock để mất 10 giây trả lời. Appium sẽ xác nhận rằng app của bạn hiển thị thông báo "Không thể kết nối" thay vì đơn giản là treo máy.
+*   **Thử nghiệm Schema/Payload Hỏng:** Trả về JSON bị sai cấu trúc (Invalid schema). Test phải đảm bảo App xử lý được exception này bằng cơ chế Graceful Degradation (giảm thiểu gián đoạn) mà không bị Crash.
 
-### 2. Giả lập Sự cố và Tác động của Thời gian thực (Failure Injection & Time Simulation)
+### 3. Kết hợp Validation Request trong WireMock
+Luôn luôn kiểm tra các điều kiện đầu vào. Nếu bạn chỉ Mock một Endpoint, hãy thêm `matchingRules` để đảm bảo rằng mọi test case đều phải gửi kèm theo những dữ liệu bắt buộc (ví dụ: tất cả requests POST đều phải có trường `user_id`).
 
-Một QE Lead giỏi không chỉ biết API hoạt động *khi thành công*. Họ phải biết nó hoạt động như thế nào **khi thất bại**.
+---
 
-*   **Hành vi cần mô phỏng:**
-    *   **Timeouts:** Thiết lập WireMock để ngắt kết nối mạng sau 10 giây. Kiểm tra xem Appium có xử lý đúng trạng thái `TimeoutException` không, thay vì chỉ báo lỗi chung chung.
-    *   **Payload Malformation:** Mock Server trả về một JSON hợp lệ về mặt cú pháp nhưng thiếu key bắt buộc (ví dụ: Thiếu `user_id`). Ứng dụng di động của bạn phải có lớp xử lý null pointer hoặc default value để ngăn crash.
+## 📝 Kết Luận
 
-### 3. Tối ưu hóa hiệu suất Test Suite (Test Parallelization)
+Thiết lập Mock Server nâng cao bằng WireMock và tự động hóa luồng UI với Appium là một bước nhảy vọt về độ tin cậy trong quá trình kiểm thử di động. Bằng cách tách biệt logic ứng dụng khỏi sự biến đổi của môi trường Backend, chúng ta đạt được ba mục tiêu quan trọng:
 
-Nếu các test case of Mocking được chạy quá nhiều lần, việc setup và tear down mocks sẽ tốn thời gian. Hãy luôn sử dụng tính năng **reset** của WireMock tại điểm cuối (`@AfterMethod` hoặc `tearDown()`) để đảm bảo rằng trạng thái mocking giữa hai test khác nhau không bị ảnh hưởng lẫn nhau. Điều này là yếu tố cốt lõi để duy trì khả năng chạy Test Suite song song (Parallel Execution) mà vẫn đảm bảo tính nhất quán và độ tin cậy của kết quả kiểm thử.
+1.  **Tăng tốc Độ:** Test chạy nhanh hơn nhiều vì không phải chờ đợi backend thực tế.
+2.  **Đảm bảo Tính Lặp lại (Determinism):** Kết quả kiểm thử luôn giống nhau, giúp đội ngũ tự tin vào kết quả CI/CD.
+3.  **Khả năng Cô lập (Isolation):** Bạn có thể test một tính năng mới mà không cần triển khai hoặc chờ đợi bất kỳ dịch vụ nào khác trong hệ sinh thái Microservices.
 
-***
+Hãy bắt đầu áp dụng phương pháp Mocking này ngay hôm nay, và tôi tin rằng bạn sẽ thấy sự cải thiện rõ rệt về chất lượng và tốc độ kiểm thử tự động của toàn đội!
 
-## Kết luận
+Nếu có bất kỳ câu hỏi nào về việc tích hợp hoặc cấu hình các luồng mock phức tạp, đừng ngần ngại trao đổi với tôi nhé.
 
-Việc làm chủ Mock Server bằng WireMock và sử dụng nó cùng Appium không chỉ giúp chúng ta cách ly quá trình kiểm thử khỏi sự phụ thuộc bên ngoài, mà còn nâng tầm vai trò của QA từ người "kiểm tra lỗi" thành **Kỹ sư mô phỏng trải nghiệm hệ thống (System Simulation Engineer)**.
-
-Hãy bắt đầu áp dụng phương pháp này vào các dự án lớn sắp tới của bạn. Tôi tin rằng, khi bạn đã làm chủ việc kiểm soát API, mọi sự cố backend sẽ không còn là nỗi sợ hãi nữa!
-
-Chúc các anh chị em luôn vững vàng trên con đường chinh phục Chất lượng Phần mềm!
-
+**Trân trọng,**
 **Khánh Đỗ**
-*Quality Engineering Lead*
+***QE Lead Expert***
