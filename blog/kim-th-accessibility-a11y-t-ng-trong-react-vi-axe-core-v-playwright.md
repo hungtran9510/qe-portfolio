@@ -1,7 +1,7 @@
 ---
 title: "Kiểm thử Accessibility (a11y) tự động trong React với axe-core và Playwright"
-date: 2026-06-25
-description: "Hướng dẫn chuyên sâu từ Duy Trung về việc tích hợp kiểm thử a11y mạnh mẽ bằng axe-core và Playwright trong các ứng dụng React hiện đại."
+date: 2026-06-26
+description: "Hướng dẫn chuyên sâu từ QE Lead Duy Trung về cách tích hợp axe-core vào Playwright để kiểm tra a11y tự động, đảm bảo sản phẩm đạt chuẩn WCAG."
 tags: ["Accessibility","React","Playwright"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Duy Trung"
@@ -9,161 +9,202 @@ author: "Duy Trung"
 
 # Kiểm thử Accessibility (a11y) tự động trong React với axe-core và Playwright
 
-Xin chào các đồng nghiệp Dev và QE! Tôi là Duy Trung. Trong thế giới phát triển Web hiện đại, việc tạo ra những sản phẩm không chỉ *hoạt động* tốt mà còn phải *có thể sử dụng được cho mọi người* (inclusive) là một yêu cầu bắt buộc, không còn là tính năng bổ sung.
+Xin chào các đồng nghiệp kỹ thuật! Tôi là Duy Trung, một chuyên gia Kỹ thuật Đảm bảo Chất lượng Phần mềm. Trong hành trình xây dựng các sản phẩm web hiện đại bằng React, chúng ta thường tập trung rất nhiều vào tính năng (Functionality) và hiệu suất (Performance). Nhưng có một khía cạnh vô cùng quan trọng mà nếu bỏ qua sẽ gây ra rào cản lớn cho người dùng: **Tính khả dụng (Accessibility - a11y)**.
 
-Nếu bạn đang xây dựng các ứng dụng React phức tạp và muốn đảm bảo chúng thân thiện với cả người dùng thông thường lẫn những người dùng sử dụng công nghệ hỗ trợ (như Screen Reader), thì chủ đề hôm nay chính là dành cho bạn: **Kiểm thử Accessibility (a11y) tự động bằng sự kết hợp giữa `axe-core` và Playwright.**
+Một sản phẩm không dễ tiếp cận với người khiếm thị, người sử dụng trình đọc màn hình (Screen Reader), hay những người gặp vấn đề về vận động (Motor Disabilities) thì dù hoàn hảo đến mấy cũng coi như thất bại về mặt trải nghiệm và trách nhiệm xã hội.
 
-Bài viết này sẽ không chỉ cung cấp lý thuyết mà còn đi sâu vào thực tiễn, hướng dẫn các bước thiết lập một hệ thống kiểm thử a11y mạnh mẽ ngay trong CI/CD pipeline của bạn.
+Bài viết hôm nay sẽ là một hướng dẫn chuyên sâu về việc chúng ta có thể tích hợp quy trình kiểm thử Accessibility tự động, mạnh mẽ và đáng tin cậy bằng sự kết hợp giữa **`axe-core`** và **Playwright**, đặc biệt tối ưu cho các ứng dụng React hiện đại.
 
-***
+---
 
-## 💡 I. Tại sao chúng ta cần tự động hóa Accessibility Testing?
+## 💡 I. Tại sao phải dùng Playwright + axe-core?
 
-Nhiều đội ngũ thường mắc sai lầm khi nghĩ rằng "chỉ cần làm qua Lighthouse là đủ." Mặc dù Google Lighthouse là một công cụ tuyệt vời, nó chỉ cung cấp các điểm đo lường (scores) và không thay thế được quá trình kiểm thử thực tế, đặc biệt khi chúng ta muốn nhúng quy trình này vào Unit/E2E testing.
+Trước khi đi vào code, chúng ta cần hiểu vai trò của từng thành phần:
 
-**Vấn đề cốt lõi:**
-1. **Tính nhất quán (Consistency):** Kiểm thử thủ công dễ bị sót. Tự động hóa đảm bảo mọi luồng người dùng đều được kiểm tra với cùng một tiêu chuẩn a11y.
-2. **Tích hợp quy trình (Shift Left):** Việc phát hiện lỗi a11y sớm, ngay khi code được commit, giúp tiết kiệm hàng trăm giờ sửa chữa sau này.
+### 1. Về `axe-core` (The Engine)
+`axe-core` là thư viện kiểm tra khả năng tiếp cận uy tín hàng đầu thế giới, được phát triển bởi Deque Systems. Nó không chỉ đơn thuần là một công cụ tìm lỗi; nó thực hiện việc đánh giá DOM (Document Object Model) dựa trên các quy tắc của tiêu chuẩn WCAG (Web Content Accessibility Guidelines).
 
-Đây là lúc chúng ta cần đến sự kết hợp sức mạnh giữa các thư viện chuyên biệt: **`axe-core`** và **Playwright**.
+*   **Điểm mạnh:** Độ chính xác cao, cập nhật liên tục theo các phiên bản WCAG mới nhất.
+*   **Hạn chế (Khi đứng một mình):** Nó chỉ là một bộ đánh giá rules, cần một môi trường thực thi để đọc DOM và mô phỏng hành vi người dùng.
 
-*   **`axe-core`:** Là một công cụ kiểm thử a11y dựa trên WAI-ARIA, nó được xây dựng bởi Deque Systems. Vai trò của nó là quét DOM (Document Object Model) và xác định các vấn đề vi phạm tiêu chuẩn WCAG (Web Content Accessibility Guidelines).
-*   **Playwright:** Là một framework E2E testing hiện đại hỗ trợ nhiều trình duyệt, hoạt động với khả năng mô phỏng người dùng thực tế (nhấp chuột, nhập liệu, chờ đợi trạng thái DOM thay đổi).
+### 2. Về Playwright (The Browser & Orchestrator)
+Playwright là một framework tự động hóa web tiên tiến của Microsoft. Nó cho phép chúng ta điều khiển một trình duyệt (Chromium, Firefox, WebKit) ở mức độ rất sâu.
 
-Khi kết hợp hai thứ này: Playwright giúp chúng ta **đến được** trang và kích hoạt hành vi của người dùng; còn `axe-core` giúp chúng ta **kiểm tra** tính khả dụng (usability) của nội dung tại điểm đó.
+*   **Vai trò trong a11y:** Thay vì chỉ kiểm tra DOM tĩnh, Playwright mô phỏng toàn bộ hành vi người dùng thật: Click chuột, chờ đợi AJAX callback, xử lý sự kiện JavaScript phức tạp... Nó đảm bảo rằng khi React component được mount và cập nhật state, `axe-core` sẽ đánh giá trên trạng thái **DOM cuối cùng** (The actual rendered DOM).
 
-***
+### 🔑 Kết luận về sự kết hợp
+Chúng ta dùng Playwright để *thực thi* hành vi người dùng và lấy DOM đã render. Sau đó, chúng ta đưa DOM này vào hàm của `axe-core` để *kiểm định* tính khả dụng theo tiêu chuẩn WCAG.
 
-## 🛠️ II. Thiết lập Môi trường Phát triển (Prerequisites)
+---
 
-Để bắt đầu, hãy đảm bảo dự án React của bạn đã được cấu hình với Playwright.
+## 🛠️ II. Thiết lập Môi trường Phát triển (Setup)
+
+Giả sử bạn đang có một dự án React/Playwright cơ bản (`npm create playwright@latest`).
+
+**Bước 1: Cài đặt các dependencies cần thiết.**
+Chúng ta cần `axe-core` để thực hiện việc đánh giá.
 
 ```bash
-# Cài đặt dependencies cần thiết
-npm install -D @axe-core/react playwright # Hoặc chỉ dùng axe-core cho testing server side
-npx playwright install
+# Trong thư mục root của project
+npm install axe-core
+npm install -D @testing-library/jest-dom # Có thể hỗ trợ cho testing framework khác
 ```
 
-Do `axe-core` là một thư viện kiểm tra DOM, chúng ta sẽ sử dụng nó trong ngữ cảnh của E2E testing, nơi Playwright đã tải xong trang.
+**Bước 2: Cấu trúc dự án.**
+Bạn sẽ cần một file kiểm thử (ví dụ: `cypress/e2e/accessibility.spec.ts`) để chứa logic của mình.
 
-***
+---
 
-## 🚀 III. Triển khai Kiểm thử a11y với Playwright và axe-core (The Core Logic)
+## 💻 III. Triển khai Kiểm thử a11y trong Playwright
 
-Vấn đề lớn nhất khi kiểm thử a11y là việc **thực hiện kiểm tra sau khi DOM đã được Render hoàn toàn** (ví dụ: sau một API call thành công, hoặc sau khi user click vào nút mở modal).
+Đây là phần quan trọng nhất và thể hiện vai trò chuyên môn của chúng ta. Chúng ta sẽ sử dụng cú pháp TypeScript/JavaScript tiêu chuẩn của Playwright Test Runner.
 
-Playwright cung cấp một cách tuyệt vời để chúng ta đánh chặn và thực thi kiểm tra tại các thời điểm cụ thể.
+### Ví dụ: Kiểm tra một component có form input cơ bản
 
-### 1. Phương pháp cơ bản: Kiểm tra DOM tĩnh
+Giả sử bạn có một component React chứa một Form và Input field, và nhiệm vụ là kiểm tra xem việc thiếu `aria-label` hoặc nhãn (label) cho input đó có bị phát hiện không.
 
-Đây là trường hợp đơn giản nhất, chỉ cần quét toàn bộ trang ngay sau khi load.
+**Code Example (`accessibility.spec.ts`):**
 
-**`e2e-a11y.spec.ts` (Playwright Test File):**
 ```typescript
+// Import các thư viện cần thiết
 import { test, expect } from '@playwright/test';
-// Chúng ta có thể import axe từ các wrappers hoặc dùng cách inject script
-import * as axe from 'axe-core'; 
+import * as axe from 'axe-core';
 
-test('Should pass basic a11y checks on the homepage', async ({ page }) => {
-    await page.goto('http://localhost:3000');
+/**
+ * Hàm utility để thực hiện kiểm tra a11y trên một selector cụ thể.
+ * @param elementSelector Selector CSS của phần tử cần kiểm tra (ví dụ: '#main-content')
+ */
+const checkAccessibility = async (elementSelector: string) => {
+    console.log(`\n--- Bắt đầu kiểm tra a11y cho vùng: ${elementSelector} ---`);
 
-    // Chờ đợi nội dung chính tải xong (quan trọng!)
-    await page.waitForSelector('#main-content'); 
+    // 1. Lấy phần tử DOM bằng Playwright
+    const elementHandle = await test.page.$(elementSelector);
 
-    // Lấy toàn bộ DOM hiện tại dưới dạng string hoặc element handle
-    const dom = await page.locator('body').innerHTML(); 
+    if (!elementHandle) {
+        throw new Error(`Không tìm thấy phần tử với selector: ${elementSelector}`);
+    }
 
-    // Khởi tạo axe và chạy kiểm tra trên nội dung DOM đã lấy
-    // Lưu ý: Tùy thuộc vào cách bạn tích hợp, bạn có thể cần inject script 'axe.min.js' 
-    // và gọi hàm window.axe() từ môi trường Playwright.
-    const results = await new Promise(resolve => {
-        // Đây là pseudo-code hóa cho việc gọi axe qua context của page:
-        page.evaluate((content) => {
-            axe.run(document, { rules: ['wcag2a', 'wcag2aa'] }, (err, results) => {
-                window.__AXE_RESULTS = results; // Lưu kết quả vào window scope
-                resolve(results);
-            });
-        }, dom); 
+    // 2. Sử dụng page.evaluate() để chạy axe-core trực tiếp trong Context của trình duyệt (Browser context)
+    const results = await test.page.evaluate(async (selector) => {
+        // Lấy phần tử DOM thực tế bằng document.querySelector
+        const targetElement = document.querySelector(selector);
+
+        if (!targetElement) {
+            return { errors: [], passes: [] }; // Trả về rỗng nếu không tìm thấy
+        }
+
+        // Thực thi axe-core trên phần tử mục tiêu
+        await axe.run(targetElement, { 
+            // Tùy chọn cấu hình (ví dụ: chỉ kiểm tra các quy tắc nghiêm trọng)
+            // engine: 'html',
+        });
+
+        // Trả về kết quả của axe
+        return axe.getResults();
+
+    }, elementSelector); // Truyền selector vào hàm evaluate
+
+    const violations = results.violations;
+
+    if (violations.length > 0) {
+        console.error(`❌ [FAIL] Phát hiện ${violations.length} lỗi khả dụng.`);
+        // In ra chi tiết các lỗi để báo cáo
+        violations.forEach(violation => {
+            console.warn(`   - Quy tắc vi phạm: ${violation.id}`);
+            console.warn(`     Mô tả: ${violation.description}`);
+            console.warn(`     Áp dụng trên: [${violation.nodes[0]?.target || 'Không rõ'}]`);
+        });
+
+        // Đẩy lỗi fail để Playwright báo cáo Failure
+        throw new Error('Accessibility violation detected! Please fix the issues.');
+    } else {
+        console.log('✅ Thành công! Không phát hiện vi phạm Accessibility nào trong khu vực này.');
+    }
+};
+
+
+test.describe("Kiểm thử tích hợp tính khả dụng (a11y)", () => {
+
+    // Mocking một trang chứa form test
+    test.beforeAll(async ({ page }) => {
+        await page.goto('http://localhost:3000/form-page'); // Thay bằng URL component của bạn
+        // Cho phép các thẻ element tạm thời được load xong
+        await page.waitForTimeout(100); 
     });
 
-    // Kiểm tra xem có lỗi nào không
-    const violations = results.violations;
-    expect(violations).toHaveLength(0); 
-    console.log("🥳 Accessibility checks passed!");
+    test("a11y kiểm tra Form Input field cơ bản (Kiểm tra nhãn thiếu)", async ({ page }) => {
+        const formSelector = '#main-form'; // Selector bao quanh toàn bộ form
+        
+        // --- BƯỚC 1: Chạy check a11y trên DOM đã render
+        await checkAccessibility(formSelector);
+
+        // Giả sử nếu checkAccessibility thành công, chúng ta vẫn tiếp tục các test chức năng khác.
+    });
+
+
+    test("a11y kiểm tra sau khi tương tác (ví dụ: gửi form)", async ({ page }) => {
+        const targetSelector = '#result-message'; // Khu vực sẽ hiển thị thông báo thành công/lỗi
+
+        // 1. Mô phỏng hành vi người dùng: Điền và submit form
+        await page.locator('#username').fill('testuser');
+        await page.click('#submit-button');
+
+        // 2. Chờ đợi phản hồi của hệ thống (AJAX)
+        await page.waitForSelector(targetSelector, { state: 'visible' });
+
+        // 3. Sau khi giao diện thay đổi/render thành công, chạy check a11y lại trên khu vực mới này.
+        await checkAccessibility(targetSelector);
+    });
 });
 ```
 
-**Giải thích của Duy Trung:**
-Trong ví dụ trên, tôi đã minh họa cách sử dụng `page.evaluate()` để đảm bảo rằng chúng ta đang chạy hàm kiểm tra a11y *bên trong* ngữ cảnh trình duyệt (Browser Context) mà Playwright điều khiển. Việc này cực kỳ quan trọng vì nó cho phép `axe-core` truy cập vào DOM thực tế, chứ không phải là một chuỗi HTML thuần túy.
+### Phân tích và Giải thích Code (Từ góc nhìn của QE Lead)
 
-### 2. Phương pháp nâng cao: Kiểm tra sau các hành động tương tác (Interaction Testing)
+#### 1. `test.page.evaluate()`: Chìa khóa Vàng
+*   **Mục đích:** Khi chúng ta chạy code JavaScript/TypeScript trong file test, nó hoạt động *ngoài* ngữ cảnh trình duyệt thật. Để truy cập vào DOM đã được Playwright tải và render (cùng với các sự kiện JS của React), chúng ta phải dùng `page.evaluate()`. Hàm này cho phép chúng ta thực thi mã ngay trong **Context of the browser page**.
+*   **Tối ưu:** Chúng ta truyền `elementSelector` làm tham số thứ hai khi gọi `evaluate`, giúp giữ logic sạch sẽ và linh hoạt hơn là hardcode selector bên trong hàm.
 
-Đây là kịch bản phức tạp và phổ biến nhất trong React/SPA (Single Page Application), nơi nội dung được thêm vào hoặc thay đổi bằng JavaScript (ví dụ: mở Modal, Toggle tab). Chúng ta không thể chỉ kiểm tra DOM ban đầu.
+#### 2. Logic của `axe-core` Run
+```javascript
+// ... await axe.run(targetElement) ...
+return axe.getResults();
+```
+*   **Ý nghĩa:** Chúng ta không chỉ chạy `axe.run()` mà còn phải dùng nó để trả về kết quả (`axe.getResults()`). Việc này là cần thiết để Playwright có thể nhận và xử lý lỗi (violation) được báo cáo từ thư viện `axe-core`.
 
-**Giả sử:** Component `Modal` của bạn sẽ hiển thị một popup khi người dùng nhấp vào nút "Open Modal". เรา phải đảm bảo rằng modal đó có các thuộc tính ARIA cần thiết (`aria-expanded`, `role="dialog"`, Focus Trap).
-
+#### 3. Xử lý Lỗi Bằng Exception Throwing
 ```typescript
-test('Should pass a11y checks when the modal is displayed', async ({ page }) => {
-    await page.goto('http://localhost:3000');
-
-    // 1. Hành động tương tác gây thay đổi DOM
-    const openButton = await page.locator('#open-modal-button');
-    await openButton.click(); // Giả sử việc click này hiển thị modal
-
-    // 2. Chờ Modal xuất hiện (quan trọng: Playwright's auto-wait giúp việc này)
-    await page.waitForSelector('.modal-dialog', { state: 'visible' });
-
-    // 3. Kiểm tra a11y trên khu vực Modal mới được tạo ra/hiển thị
-    const modalDom = await page.locator('.modal-dialog').innerHTML();
-    
-    // Chạy axe chỉ riêng với phần tử modal (tối ưu hóa hiệu suất)
-    const results = await new Promise(resolve => {
-        page.evaluate((content) => {
-            axe.run(document.querySelector('.modal-dialog'), { rules: ['wcag2a'] }, (err, results) => {
-                window.__AXE_RESULTS__ = results; 
-                resolve(results);
-            });
-        }, modalDom);
-    });
-
-    const violations = results.violations;
-    expect(violations).toHaveLength(0);
-    console.log("✅ Modal a11y checks passed!");
-});
+if (violations.length > 0) {
+    // ... log detailed errors ...
+    throw new Error('Accessibility violation detected! Please fix the issues.');
+}
 ```
+*   **Thực tiễn QE:** Trong kiểm thử tự động, việc chỉ *log* lỗi là chưa đủ. Chúng ta phải buộc Playwright (hoặc Jest/Mocha) xem xét đây là một **Failure** thực sự. Bằng cách `throw new Error()`, chúng ta đảm bảo rằng nếu có vi phạm a11y nào xảy ra trong quá trình kiểm thử, test case đó sẽ bị đánh dấu FAIL ngay lập tức, ngăn không cho build tiếp tục và buộc developer phải sửa lỗi.
 
-**Điểm nhấn chuyên môn của Duy Trung:**
-Chúng ta đã áp dụng kỹ thuật **"Scoped Testing"**. Thay vì quét toàn bộ trang (có thể chứa hàng nghìn dòng mã không liên quan), chúng ta cô lập khu vực đang được thay đổi (DOM của Modal) và chỉ chạy `axe-core` trên phạm vi đó. Điều này giúp tăng tốc độ test và giúp báo cáo lỗi a11y chính xác hơn rất nhiều.
+---
 
-***
+## 🏆 IV. Các Bài học Thực tiễn từ Kinh nghiệm QE Lead (Best Practices)
 
-## 💡 IV. Tối ưu hóa và Best Practices trong CI/CD
+### 🚀 1. Kiểm thử Theo Luồng Người Dùng (User Flow Driven Testing)
+Đừng chỉ kiểm tra một component trên trạng thái tĩnh (`Static Check`). Tính khả dụng thường bị phá vỡ khi có **tương tác** hoặc **thay đổi state**.
 
-Để việc kiểm thử a11y trở thành một phần không thể thiếu của vòng lặp Dev-Test-Deploy, hãy lưu ý những điểm sau:
+*   **Ví dụ:** Khi bạn nhấn nút "Submit" và form gửi thành công, một thông báo (Alert/Toast) sẽ hiện ra. Bạn phải đảm bảo rằng component chứa Toast đó được đánh dấu `aria-live` và Playwright của bạn đã kiểm tra xem Screen Reader có đọc được thông báo này hay không sau khi sự kiện AJAX hoàn tất.
 
-### 1. Hạn chế tối đa các Rules bị bỏ qua (Rules Exemptions)
-Trong quá trình phát triển, bạn có thể phải vô hiệu hóa tạm thời các luật a11y để hoàn thiện tính năng. Tuy nhiên, **tuyệt đối không** Hardcode việc loại trừ lỗi trong code production. Hãy xem việc này là một "Technical Debt" cần được giải quyết bằng cách thay đổi cấu trúc component/DOM.
+### 🚀 2. Xử lý Kết quả Phức tạp (Asynchronous Checks)
+Trong React, nhiều thay đổi DOM là bất đồng bộ. Luôn luôn đợi đủ lâu (`await page.waitForSelector(...)`) hoặc sử dụng các cơ chế chờ có điều kiện của Playwright để đảm bảo rằng lúc bạn gọi `checkAccessibility()`, phần tử đã ở trạng thái *cuối cùng* mà người dùng sẽ thấy.
 
-### 2. Xử lý Loading States
-Hãy đảm bảo rằng các khu vực chưa tải xong hoặc đang ở trạng thái loading phải có thông báo rõ ràng cho Screen Reader (ví dụ: sử dụng `aria-live="polite"`). Các công cụ kiểm thử tự động cần được thiết lập để **chờ đợi** cho đến khi trạng thái cuối cùng (End State) được render.
+### 🚀 3. Tích hợp vào CI/CD
+Giá trị thực sự của automation là khi nó chạy tự động. Bạn phải cấu hình các pipeline CI/CD (GitHub Actions, GitLab CI) để **luôn luôn** chạy bộ test a11y này cùng với bộ test chức năng. Nếu bất kỳ quy tắc WCAG nào bị vi phạm, build phải bị thất bại (Fail Fast).
 
-### 3. Sử dụng Custom Reporters
-Nếu bạn muốn tích hợp báo cáo a11y vào Jest/Vitest hoặc Cypress Test Report, hãy tạo một Custom Reporter. Báo cáo này không chỉ nên liệt kê các lỗi như màu sắc hay Contrast Ratio mà còn phải kèm theo thẻ WCAG tiêu chuẩn (ví dụ: **WCAG 2.1 AA - [Name]**).
+---
 
-### 4. Tích hợp vào Pre-commit Hooks
-Đối với những thay đổi liên quan đến component UI lớn, hãy xem xét việc chạy một lệnh `axe-core` lỏng lẻo (lightweight check) ngay trong pre-commit hook của developer để bắt các lỗi cơ bản ngay tại nguồn.
+## 🔮 Kết Luận
 
-***
+Kiểm thử Accessibility không còn là một "tính năng phụ" (Nice-to-have), mà đã trở thành một yêu cầu kỹ thuật cốt lõi (Core Requirement) của mọi sản phẩm số hiện đại.
 
-## 🎓 Kết luận từ QE Lead Duy Trung
+Bằng cách kết hợp sức mạnh mô phỏng trình duyệt và tương tác người dùng của **Playwright** với bộ quy tắc đánh giá cực kỳ chính xác của **`axe-core`**, chúng ta không chỉ đơn thuần là viết code, mà đang xây dựng một nền tảng phần mềm công bằng và hòa nhập cho tất cả mọi người.
 
-Kiểm thử Accessibility không phải là một "bước kiểm tra" mà nó là một **Mindset** – một tư duy được thấm nhuần vào toàn bộ quy trình phát triển phần mềm của đội ngũ bạn.
+Hãy biến việc kiểm thử a11y thành một thói quen hàng ngày trong quy trình phát triển của team bạn nhé!
 
-Sự kết hợp giữa sức mạnh tương tác của Playwright và độ chính xác về tiêu chuẩn của `axe-core` không chỉ giúp code React của bạn đạt điểm 10/10 về mặt chức năng, mà còn đảm bảo nó mở ra cánh cửa cho tất cả người dùng.
-
-Hãy bắt đầu tích hợp công cụ này vào Test Suite ngay từ hôm nay, và tôi tin rằng chất lượng sản phẩm của đội bạn sẽ tăng lên một tầm cao mới!
-
-Chúc các bạn thành công với những dự án inclusive nhé!
-
-***
-**Duy Trung - QE Lead**
+*Trân trọng,*
+**Duy Trung**
+***QE Lead, Software Quality Assurance***
