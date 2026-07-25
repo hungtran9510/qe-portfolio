@@ -1,210 +1,156 @@
 ---
 title: "Continuous Testing: Thiết lập GitHub Actions CI Pipeline gửi thông báo kết quả lên Slack"
-date: 2026-06-06
-description: "Hướng dẫn chuyên sâu từng bước thiết lập CI Pipeline bằng GitHub Actions, tự động gửi báo cáo trạng thái kiểm thử (thành công/thất bại) về kênh Slack."
-tags: ["CI-CD","GitHub Actions","Slack","QE"]
+date: 2026-06-07
+description: "Hướng dẫn chuyên sâu thiết lập quy trình Continuous Testing tự động với GitHub Actions, tích hợp nhận báo cáo ngay tức thì trên Slack."
+tags: ["CI-CD","GitHub Actions","Slack"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Hồng Dung"
 ---
 
 # Continuous Testing: Thiết lập GitHub Actions CI Pipeline gửi thông báo kết quả lên Slack
 
-Xin chào các đồng nghiệp đam mê chất lượng phần mềm! Tôi là Hồng Dung, và trong vai trò một QE Lead, tôi hiểu rằng việc phát triển phần mềm không chỉ dừng lại ở việc *chạy* các bài test tự động. Thách thức thực sự nằm ở việc làm sao để chúng ta *biết ngay lập tức*, tại thời điểm nào, khi nào có lỗi xảy ra, mà không cần phải theo dõi liên tục qua màn hình terminal của GitHub Actions.
+Chào các đồng nghiệp trong lĩnh vực chất lượng phần mềm! Tôi là Hồng Dung, và hôm nay chúng ta sẽ cùng nhau đi sâu vào một chủ đề mà bất kỳ đội phát triển hiện đại nào cũng phải nắm vững: **Continuous Testing (Kiểm thử liên tục)**.
 
-Nếu bạn đang quản lý một hệ thống CI/CD và cảm thấy mệt mỏi với việc "nhảy qua lại" giữa GitHub Actions và Slack để kiểm tra trạng thái build, thì bài viết này dành cho bạn.
+Trong kỷ nguyên DevOps, việc chỉ chạy kiểm thử thủ công hoặc thậm chí là script cục bộ không còn đủ sức đáp ứng tốc độ phát hành (release velocity) nữa. Mục tiêu của chúng ta là xây dựng một hệ thống tự động hóa hoàn toàn, nơi mọi thay đổi mã nguồn đều được xác thực ngay lập tức—và quan trọng hơn hết, bạn cần nhận được thông báo kết quả **ngay tại điểm làm việc chung** của đội ngũ: Slack!
 
-Hôm nay, tôi sẽ hướng dẫn các bạn cách thiết lập một quy trình **Continuous Testing** hoàn chỉnh: Sử dụng GitHub Actions để chạy bộ test tự động và tích hợp kết quả (thành công hay thất bại) vào kênh Slack chỉ bằng vài dòng cấu hình YAML.
+Bài viết này không chỉ là lý thuyết; tôi sẽ cung cấp cho bạn một lộ trình chi tiết và các đoạn mã mẫu để thiết lập toàn bộ luồng CI/CD từ GitHub đến Slack.
 
----
+***
 
-## 🚀 I. Continuous Testing là gì và Tại sao cần Thông báo Tức thì?
+## I. Tại sao phải Continuous Testing? (The QE Perspective)
 
-### 📘 Định nghĩa Nhanh
-**Continuous Testing (CT)** là một bộ phận của vòng đời CI/CD, nhằm mục đích đảm bảo rằng chất lượng được kiểm tra liên tục tại mọi giai đoạn phát triển, thay vì đợi đến lúc chạy QA cuối kỳ. Mục tiêu cốt lõi là giảm thiểu "thời gian nhận biết lỗi" (Time to Detect Bug).
+Là những chuyên gia chất lượng, chúng ta luôn hiểu rằng lỗi càng được phát hiện sớm thì chi phí khắc phục càng thấp. Continuous Testing đảm bảo điều đó bằng cách tự động hóa các bước kiểm thử và tích hợp nó vào quy trình làm việc của nhà phát triển (Developer Workflow).
 
-### 💡 Vai trò của Thông báo Slack
-Trong một môi trường DevOps hiện đại, thông tin phải di chuyển nhanh như điện. Việc chờ các thành viên đội phát triển hoặc QE kiểm tra thủ công log build là *rủi ro lớn về mặt thời gian*. Bằng cách tích hợp Slack, chúng ta đạt được:
+**Quy trình cốt lõi:**
+1. **Code Push:** Lập trình viên commit code lên một nhánh tính năng (feature branch) trên GitHub.
+2. **Trigger CI:** Sự kiện `push` này kích hoạt GitHub Actions Pipeline.
+3. **Execute Tests:** Action chạy các bộ test tự động (Unit tests, Integration tests, E2E tests).
+4. **Report & Notify:** Dựa vào trạng thái thành công/thất bại của test suite, hệ thống sẽ gửi báo cáo chi tiết lên Slack cho cả team.
 
-1.  **Phản ứng ngay lập tức:** Khi pipeline thất bại, mọi người liên quan nhận được thông báo ngay lập tức (Instant Feedback).
-2.  **Minh bạch hóa (Visibility):** Mọi người đều có một nguồn thông tin duy nhất về trạng thái của nhánh code đó.
-3.  **Giảm rào cản chú ý:** Giúp các thành viên team không bị mất tập trung vào việc theo dõi màn hình build mà vẫn nắm bắt được tình trạng hệ thống.
+Việc này giúp chúng ta chuyển từ mô hình "Testing ở cuối vòng đời" (End-of-cycle testing) sang mô hình "Quality embedded in the cycle".
 
----
+## II. Chuẩn bị Môi trường và Kết nối (Prerequisites & Setup)
 
-## ⚙️ II. Chuẩn bị và Tiền đề (Prerequisites)
+Trước khi đi vào code, chúng ta cần chuẩn bị các thành phần sau:
 
-Trước khi đi sâu vào mã nguồn, chúng ta cần chuẩn bị "nguyên liệu" quan trọng nhất: Các bí mật (Secrets). **Bạn tuyệt đối không nên lưu API Token hay Webhook URL trực tiếp trong code YAML.**
+### 1. Thiết lập GitHub Secrets
+Để hành động CI của bạn có thể giao tiếp với Slack một cách bảo mật, bạn cần lấy **Webhook URL** từ kênh Slack mong muốn và lưu nó vào GitHub Secrets (Settings > Secrets and Variables > Actions).
 
-### 1. Thiết lập Slack Webhook
-Cách đơn giản và hiệu quả nhất cho việc gửi thông báo là sử dụng Incoming Webhooks của Slack.
+*   **Tên Secret:** `SLACK_WEBHOOK_URL`
+*   **Giá trị:** URL Webhook được tạo ra. *(Lưu ý: Tuyệt đối không commit trực tiếp webhook này lên code!)*
 
-*   **Bước 1:** Truy cập mục Apps tích hợp của Slack (hoặc dùng giao diện Chat/Apps).
-*   **Bước 2:** Tạo một webhook mới cho kênh mà bạn muốn nhận thông báo.
-*   **Kết quả:** Bạn sẽ nhận được một URL duy nhất có dạng `https://hooks.slack.com/services/T00.../B00.../XXXXXXXXXXXXXXXXXXXXXXXX`.
+### 2. Cấu trúc Project (Giả định)
+Chúng ta giả sử dự án của bạn là một ứng dụng web đơn giản, và các bài test tự động của bạn (ví dụ: Jest/Mocha cho Unit Test; Cypress/Playwright cho E2E Test) đã sẵn sàng để được gọi từ môi trường CI.
 
-### 2. Lưu Webhook vào GitHub Secrets
-GitHub Actions cung cấp cơ chế bí mật (Secrets) để lưu trữ các chuỗi dữ liệu nhạy cảm này.
+## III. Xây dựng GitHub Actions Workflow (`.github/workflows/ci-test.yml`)
 
-*   Vào Repository của bạn trên GitHub $\rightarrow$ **Settings** $\rightarrow$ **Secrets and Variables** $\rightarrow$ **Actions**.
-*   Nhấn `New repository secret`.
-*   Tạo Secret có tên: `SLACK_WEBHOOK_URL`
-*   Dán URL Webhook vừa lấy vào giá trị của Secret này.
+Đây là trái tim của quy trình tự động hóa. Chúng ta sẽ tạo một file YAML trong thư mục `.github/workflows/` để định nghĩa luồng công việc (workflow).
 
-> 💡 **Mẹo chuyên nghiệp từ Hồng Dung:** Thay vì chỉ dùng một webhook chung, bạn nên tạo các webhooks riêng cho từng môi trường (ví dụ: `DEV_SLACK_WEBHOOK`, `PROD_SLACK_WEBHOOK`) để tăng cường khả năng bảo mật và phân quyền.
-
----
-
-## 🛠️ III. Triển khai GitHub Actions Pipeline YAML
-
-Chúng ta sẽ tạo một file quy trình tự động hóa tại đường dẫn `.github/workflows/ci_test.yml`. File này sẽ chịu trách nhiệm kiểm thử và sau đó gọi hành động gửi thông báo Slack.
-
-### Cấu trúc Workflow Code (YAML)
+Dưới đây là cấu hình đầy đủ:
 
 ```yaml
-# .github/workflows/ci_test.yml
-name: Automated Testing and Slack Reporting
+name: CI - Run Tests and Notify Slack
 
 on:
   push:
-    branches:
-      - main # Trigger khi push lên nhánh chính
+    branches: [ main, develop ] # Kích hoạt khi push lên nhánh main hoặc develop
   pull_request:
-    branches:
-      - main # Trigger khi mở PR vào nhánh chính
+    types: [ opened, synchronize, closed ] # Kích hoạt khi PR được mở/cập nhật
 
 jobs:
-  test_and_report:
+  test:
+    # Xác định môi trường chạy (GitHub-hosted runner)
     runs-on: ubuntu-latest
-
+    
     steps:
-    # 1. Checkout code
-    - name: Checkout Repository Code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4 # Tải mã nguồn từ GitHub
+        
+      - name: Set up Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Sử dụng phiên bản Node.js cụ thể
 
-    # 2. Setup Environment (Ví dụ: Node.js cho React/Vue)
-    - name: Set up Node.js Environment
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      # 🧪 Bước 1: Chạy Unit Tests (Ví dụ sử dụng thư viện Jest)
+      - name: Install Dependencies and Run Unit Tests
+        run: |
+          npm install
+          npm run test:unit # Giả định script này chạy unit tests
+        continue-on-error: true # Rất quan trọng: Cho phép bước tiếp theo chạy ngay cả khi test thất bại
+        
+      # 🚀 Bước 2: Chạy E2E Tests (Chỉ chạy trên nhánh main/develop)
+      - name: Run End-to-End Tests (If on main branch)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        run: |
+          npm run test:e2e # Giả định script này chạy e2e tests
 
-    # 3. Run Tests (Đây là bước kiểm thử thực tế của bạn)
-    # Giả sử bạn có lệnh test trong package.json
-    - name: Execute Unit and Integration Tests
-      run: |
-        npm ci # Cài đặt dependencies sạch
-        npm run test -- --coverage # Chạy bài test và yêu cầu tạo report coverage
-      id: test_step
+      # 📬 Bước 3: Gửi thông báo kết quả lên Slack
+      - name: Send Test Results to Slack
+        if: always() # Luôn chạy bước này, bất kể các bước test trước đó thành công hay thất bại
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const webhookUrl = "${{ secrets.SLACK_WEBHOOK_URL }}";
+            let statusMessage;
+            let failureCount = 0;
 
-    # 4. Logic Gửi Thông báo Slack (Sử dụng script Conditional)
-    - name: Send Slack Notification Status
-      uses: actions/github-script@v7
-      if: always() # Chạy bước này BẤT KỂ kết quả của bước trên (thành công hay thất bại)
-      with:
-        script: |
-          // Xác định trạng thái build: THÀNH CÔNG hoặc THẤT BẠI
-          const jobStatus = '${{ needs.test_and_report.job.status }}';
+            // Logic xác định trạng thái chung của workflow
+            if (core.getInput('failure').trim() === 'true') {
+              statusMessage = "🚨 :red_circle: **FAILURE detected!** - Continuous Testing FAILED.";
+              failureCount = 1; // Set flag báo lỗi
+            } else if (context.job.conclusion !== 'success') {
+                // Bắt các thất bại từ job runner, nếu không có giá trị cụ thể thì mặc định fail
+                statusMessage = "🛑 :red_circle: **TESTING FAILED.** Please review the CI logs immediately.";
+                failureCount = 1;
+            } else {
+              statusMessage = "✅ :green_circle: **SUCCESS!** - Continuous Tests passed successfully!";
+            }
 
-          let messageColor;
-          let title;
-
-          if (jobStatus === 'success') {
-            title = "✅ CI/CD Pipeline Thành Công!";
-            messageColor = "#36a64f"; // Màu xanh lá cây
-          } else if (jobStatus === 'failure' || jobStatus === 'canceled') {
-            title = "🚨 LỖI KHI KIỂM THỬ! Vui lòng kiểm tra ngay.";
-            messageColor = "#d9534f"; // Màu đỏ
-          } else {
-            title = "⚠️ Cảnh báo: Pipeline kết thúc với trạng thái không xác định.";
-            messageColor = "#f0ad4e"; // Màu vàng cam
-          }
-
-          // Xây dựng nội dung tin nhắn Slack sử dụng Markdown
-          const payload = JSON.stringify({
-            text: `:wave: *Báo cáo CI/CD cho Repository:* <${process.env['GITHUB_SERVER']}/${process.env['GITHUB_REPOSITORY']}>`,
-            blocks: [
-              {
-                type: "section",
-                text: {
-                  type: "mrkdwn",
-                  text: `*Báo cáo Test Status*:\n<${title}>`
+            // Nội dung thông báo Slack
+            const payload = {
+              text: `${statusMessage}\n*Commit:* \`${{ github.sha }}\`\n*Branch:* \`${{ github.ref }}\`\n*User:* <${{ github.actor }}|${{ github.actor }}>`,
+              attachments: [
+                {
+                  color: failureCount ? "#dc3545" : "#28a745", // Red for failure, Green for success
+                  fields: [
+                    { title: "Triggered by:", value: "${{ github.event.head_branch }}", short: true },
+                    { title: "Repository:", value: "${{ github.repository }}", short: true }
+                  ]
                 }
-              },
-               {
-                type: "divider"
-              },
-              {
-                type: "section",
-                fields: [
-                    { type: "mrkdwn", text: `*Status:* \`${jobStatus.toUpperCase()}\`` },
-                    { type: "mrkdwn", text: `*Branch:* ${process.env['GITHUB_REF']} (${process.env['GITHUB_HEAD_REF']})`}
-                ]
-              },
-              {
-                type: "actions",
-                elements: [{
-                  type: "button",
-                  text: "Xem chi tiết Pipeline trên GitHub",
-                  style: "primary",
-                  url: `${process.env['GITHUB_SERVER']}/${process.env['GITHUB_REPOSITORY']}/actions/runs/${process.env['RUN_ID']}`
-                }]
-              }
-            ]
-          });
+              ]
+            };
 
-          // Gửi payload đến Slack Webhook
-          fetch('https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK_URL', { // <-- Thay YOUR_SLACK_WEBHOOK_URL bằng Secret của bạn
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(payload)
-          });
-
+            await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 ```
 
----
+## IV. Giải thích Chi tiết của QE Lead Hồng Dung (The Deep Dive)
 
-## 🔍 IV. Giải thích Chuyên sâu từ Hồng Dung (QE Lead Analysis)
+Trong vai trò một QA chuyên nghiệp, tôi muốn giải thích sâu ba điểm quan trọng trong script trên:
 
-Các bạn cần nắm vững từng thành phần của file YAML này để có thể tùy chỉnh nó cho các ngôn ngữ và quy trình kiểm thử khác nhau.
+### 1. `continue-on-error: true`
+**Ý nghĩa:** Đây là một chỉ thị cực kỳ quan trọng về mặt quy trình CI/CD. Nếu bước Unit Test bị lỗi (ví dụ: 50 bài test fail), mặc định GitHub Actions sẽ dừng toàn bộ Pipeline ngay lập tức, và bạn sẽ không bao giờ chạy đến E2E Tests.
+**Giải pháp của QE:** Bằng cách đặt `continue-on-error: true`, chúng ta đảm bảo rằng ngay cả khi một loại test (Unit) thất bại, hệ thống vẫn cố gắng chạy các bước kiểm thử sau (E2E). Điều này giúp bạn có cái nhìn toàn diện về những gì đã bị ảnh hưởng.
 
-### 1. Trigger và Scope (`on: push` / `pull_request`)
-*   **Mục đích:** Chỉ định khi nào workflow sẽ chạy (ví dụ: mỗi lần code được push lên nhánh `main`). Điều này giúp tối ưu hóa tài nguyên CI/CD.
+### 2. Logic `if: always()`
+**Ý nghĩa:** Câu lệnh này được gắn vào bước cuối cùng (`Send Test Results to Slack`). Thay vì chỉ chạy khi mọi thứ thành công, `always()` đảm bảo rằng bước thông báo **luôn luôn được thực thi**, dù các bước test trước đó có thất bại hay không.
+**Tầm quan trọng:** Nếu ta để nó chạy trong điều kiện success, và bài test fail, bạn sẽ hoàn toàn mất kết nối với đội nhóm, vì Slack sẽ im lặng!
 
-### 2. Tách biệt Job và Step
-*   **Job (`test_and_report`):** Một nhóm các tác vụ phải cùng nhau thực hiện (trong trường hợp này là chạy test VÀ báo cáo kết quả).
-*   **Step:** Các lệnh cụ thể được thực thi. Việc đặt bước chạy test trước, và bước gửi thông báo sau, giúp chúng ta có cơ hội để *bắt* trạng thái của bước trước đó.
+### 3. Sử dụng `actions/github-script` (The Advanced Bit)
+Thay vì dùng lệnh `curl` brute force JSON payload qua Webhook, tôi đã sử dụng action **`actions/github-script`**. Tại sao?
+*   **Sức mạnh:** Nó cho phép chúng ta viết logic JavaScript *trực tiếp trong pipeline*. Điều này giúp chúng ta có thể kiểm tra biến môi trường (context.job.conclusion), xác định trạng thái thất bại, và xây dựng payload thông báo một cách linh hoạt và phức tạp hơn nhiều so với việc chỉ dùng cú pháp shell cơ bản.
+*   **Ví dụ logic:** Tôi đã thiết lập một logic đơn giản để nhận diện trạng thái tổng quát của job (`context.job.conclusion`) để quyết định màu sắc và nội dung thông báo trên Slack, giúp team biết ngay mức độ nghiêm trọng của vấn đề mà không cần xem log dài dòng.
 
-### 3. The Magic Keyword: `if: always()`
-*   Đây là phần quan trọng nhất về mặt Logic CI/CD. Theo mặc định, một step chỉ chạy nếu các step trước thành công. Tuy nhiên, chúng ta muốn *thông báo Slack vẫn được gửi*, dù cho việc kiểm thử có thất bại hay không (vì thông báo lỗi cũng là một kết quả cần thiết!).
-*   `if: always()` đảm bảo rằng bước `Send Slack Notification Status` sẽ chạy kể cả khi bước `Execute Unit and Integration Tests` đã gặp lỗi.
+## V. Kết luận: Trở thành đội nhóm phản ứng nhanh (Rapid Response Team)
 
-### 4. Phân tích Lệnh `actions/github-script@v7`
-Thay vì dùng cURL hay HTTP request thuần, tôi sử dụng [`actions/github-script`](https://github.com/actions/github-script) để viết một đoạn code JavaScript nhỏ gọn bên trong workflow. Điều này giúp chúng ta:
+Việc triển khai một Continuous Testing pipeline kết nối với Slack không chỉ là việc tự động hóa các script; nó là việc xây dựng **một cơ chế giao tiếp chất lượng**. Nó đảm bảo rằng, khi hệ thống phát hiện ra bất kỳ sự sai lệch nào giữa mã nguồn và tiêu chuẩn chất lượng, thông tin đó sẽ đến đúng người (Developer hoặc Product Owner) tại nơi họ cần nhất.
 
-*   **Truy cập Biến Môi trường:** Dễ dàng truy cập các biến tích hợp của GitHub như `process.env['GITHUB_REPOSITORY']` (tên repo), và đặc biệt là trạng thái Job bằng cú pháp `${{ needs.test_and_report.job.status }}`.
-*   **Logic Điều kiện:** Chúng ta viết một khối logic `if/else` để xác định màu sắc (`messageColor`) và tiêu đề (`title`) dựa trên trạng thái thực tế của pipeline (Success, Failure).
+Hãy nhớ rằng, Continuous Testing không phải là đích đến; nó là một **quy trình cải tiến liên tục**. Hãy bắt đầu với những gì bạn có, đo lường độ phủ test, và dần dần mở rộng phạm vi kiểm thử!
 
-### 5. Cấu trúc Payload Slack
-Tôi thiết kế payload theo cấu trúc `blocks` của Slack API thay vì chỉ dùng text đơn giản. Điều này cho phép chúng ta gửi các định dạng giàu thông tin như:
+Chúc các đồng nghiệp luôn xây dựng nên những sản phẩm chất lượng cao nhất!
 
-*   **Titles:** Sử dụng icon và màu sắc nổi bật để người nhận chú ý ngay lập tức.
-*   **Fields:** Trình bày Status, Branch một cách có tổ chức (bằng hai cột).
-*   **Action Buttons:** Cung cấp một nút bấm liên kết trực tiếp về log chi tiết trên GitHub Actions, giúp đội phát triển không cần mất thời gian tìm kiếm thủ công.
-
----
-
-## ✨ V. Kết luận và Bước Nâng cao
-
-Thiết lập CI Pipeline với thông báo Slack là bước đi bắt buộc đối với bất kỳ team nào nghiêm túc về chất lượng sản phẩm của mình. Nó biến một quy trình kiểm thử thụ động thành một hệ thống giám sát chủ động (Active Monitoring System).
-
-**Thử thách tiếp theo cho các bạn:**
-
-1.  **Quản lý nhiều môi trường:** Thay vì dùng webhook chung, hãy tạo một hàm (function) trong script để đọc từ các secrets khác nhau dựa trên nhánh hiện tại (`if branch == 'production'`).
-2.  **Tích hợp Metrics:** Nếu bộ test của bạn xuất ra file JUnit XML hoặc Cobertura XML, bạn có thể tích hợp thêm bước đọc file này và gửi *số lượng tests* (ví dụ: "Chạy 120 bài Test - 1 lỗi") vào thông báo Slack để tăng tính minh bạch.
-
-Nếu các bạn đã áp dụng quy trình này thành công, đừng quên chia sẻ kinh nghiệm của mình dưới phần bình luận nhé! Chúc chúng ta cùng nhau xây dựng những sản phẩm chất lượng nhất!
-
-*Trân trọng,*
-**Hồng Dung**
-*QE Lead | DevOps Advocate*
+***
+*Hồng Dung - Quality Engineer Lead.*
