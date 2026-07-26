@@ -1,202 +1,172 @@
 ---
 title: "Áp dụng Test Driven Development (TDD) trong phát triển Node.js REST API"
 date: 2026-05-05
-description: "Hướng dẫn chuyên sâu cách áp dụng chu trình TDD (Red-Green-Refactor) để xây dựng các Node.js REST API ổn định, dễ bảo trì và chất lượng cao."
-tags: ["TDD","Node.js","Clean Code"]
+description: "Hướng dẫn chuyên sâu cách áp dụng TDD theo chu trình Red-Green-Refactor để xây dựng các REST API mạnh mẽ, dễ bảo trì bằng Node.js."
+tags: ["TDD","Node.js","REST API","Testing"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Duy Trung"
 ---
 
 # Áp dụng Test Driven Development (TDD) trong phát triển Node.js REST API
 
-Chào các đồng nghiệp và những ai đang trên hành trình xây dựng hệ thống phần mềm chất lượng! Tôi là Duy Trung, một Quality Engineer chuyên về tối ưu hóa quy trình kiểm thử tự động.
+**(Bài viết của Duy Trung – QE Lead)**
 
-Trong thế giới của phát triển backend hiện đại, nơi mà tốc độ và tính ổn định là hai yếu tố không thể tách rời, việc viết code chỉ dựa trên kinh nghiệm là một rủi ro cực lớn. Đặc biệt với Node.js – một nền tảng asynchronous mạnh mẽ nhưng cũng phức tạp trong quản lý luồng dữ liệu.
+Xin chào các anh chị và em, tôi là Duy Trung, chuyên gia Kỹ thuật Đảm bảo Chất lượng Phần mềm.
 
-Bài viết này không chỉ dừng lại ở việc *giới thiệu* Test Driven Development (TDD), mà tôi sẽ dẫn dắt bạn đi qua quy trình ứng dụng nó một cách thực tế nhất khi phát triển các REST API bằng Node.js. Nếu làm đúng, TDD sẽ giúp bạn biến những bản API vốn lỏng lẻo thành những cỗ máy hoạt động tin cậy đến từng miligiây.
+Trong vòng xoáy phát triển phần mềm hiện đại với tốc độ đổ bộ của các ứng dụng microservices và API Gateway, chất lượng mã nguồn không chỉ dừng lại ở việc chạy được (functional) mà còn phải đảm bảo tính bền vững, khả năng mở rộng, và quan trọng nhất là **khả năng kiểm thử (testability)**.
 
-## 🚀 I. TDD là gì và Tại sao cần nó cho REST API?
+Hôm nay, tôi muốn chia sẻ một chủ đề cực kỳ cốt lõi nhưng đôi khi bị xem nhẹ: **Test Driven Development (TDD)**. Đặc biệt áp dụng TDD cho các dự án Node.js REST API. Đây không chỉ là việc viết thêm unit test; nó là một *thay đổi tư duy* trong quy trình phát triển, giúp chúng ta xây dựng những API sạch sẽ và cực kỳ an toàn trước mọi thay đổi.
+
+---
+
+## 💡 I. TDD Là Gì? Tại Sao Cần Nó Cho Node.js API?
 
 ### Định nghĩa lại TDD
-TDD không phải là một framework hay một công cụ; nó là một **phương pháp luận (methodology)**, được gói gọn trong chu trình ba bước huyền thoại:
+TDD không phải là việc viết test sau khi code xong (Test Driven) mà là **viết Test trước, mới viết Code**. Quy trình này tuân theo chu kỳ ba bước lặp đi lặp lại:
 
-1.  **🔴 Red (FAIL):** Viết test case *trước*, và đảm bảo rằng test này đang thất bại vì chưa có code nào hỗ trợ nó.
-2.  **🟢 Green (PASS):** Viết lượng mã tối thiểu cần thiết để các tests vừa viết được **vượt qua**.
-3.  **🟡 Refactor (CLEAN):** Cải thiện cấu trúc code, làm cho nó sạch hơn, dễ đọc hơn và hiệu quả hơn – *mà không thay đổi hành vi* đã được kiểm thử.
+1.  **RED (Fail):** Viết một bài kiểm thử tự động cho chức năng mong muốn (và nó *phải* thất bại vì code chưa tồn tại).
+2.  **GREEN (Pass):** Viết lượng mã sản xuất tối thiểu cần thiết để khiến bài kiểm thử đó chuyển sang trạng thái thành công.
+3.  **REFACTOR (Clean):** Tái cấu trúc code và test để làm cho nó sạch hơn, hiệu quả hơn mà vẫn đảm bảo rằng tất cả các bài test đều màu xanh lục.
 
-### Tại sao TDD là cứu cánh của Node.js Backend?
-Khi phát triển API, chúng ta thường phải đối mặt với các vấn đề sau:
+### Lợi ích khi áp dụng TDD vào API Development
+Đối với Node.js REST API – nơi chúng ta thường xuyên xử lý luồng nghiệp vụ phức tạp (business logic) và tương tác với nhiều dependency bên ngoài (DB, cache, microservices)—TDD mang lại những lợi ích vượt trội:
 
-1.  **Asynchronous Complexity:** Code Node.js rất nhiều logic liên quan đến Promises và `async/await`. Nếu không có test case cụ thể cho từng luồng xử lý (ví dụ: gọi Database $\rightarrow$ Gọi Microservice $A \rightarrow$ Tính toán kết quả), việc tìm ra bug race condition là ác mộng.
-2.  **Edge Cases:** Các API hay bị lỗi ở các trường hợp biên (ví dụ: input rỗng, giá trị âm, dữ liệu vượt quá giới hạn). TDD buộc bạn phải nghĩ đến những trường hợp "xấu" này ngay từ đầu.
-3.  **Maintainability:** Khi team phát triển nhanh, code thường trở nên lộn xộn. Các bài test TDD hoạt động như một bộ *tài liệu hành vi sống* (Living Documentation), giúp mọi lập trình viên mới tham gia vào project cũng hiểu được API cần làm gì ở từng điểm.
+1.  **Bắt lỗi ngay từ đầu:** Chúng ta buộc phải suy nghĩ về *cách sử dụng* code trước khi viết nó, giúp lộ ra các lỗ hổng thiết kế và edge case mà chúng ta dễ bỏ qua.
+2.  **Cấu trúc API sạch (Design Quality):** TDD khuyến khích việc chia nhỏ chức năng (Single Responsibility Principle - SRP), khiến lớp service logic của bạn cực kỳ thuần túy và có tính module cao.
+3.  **Tài liệu sống:** Bộ test case tốt chính là tài liệu kỹ thuật chi tiết, chỉ ra các hành vi (behavior) mà API phải tuân thủ ở mọi thời điểm.
 
-## 🛠️ II. Hướng dẫn Thực Hành: Áp dụng TDD trong Node.js
+---
 
-Để minh họa, chúng ta sẽ xây dựng một module đơn giản xử lý việc tạo và lấy thông tin người dùng (`UserService`), tập trung vào logic nghiệp vụ (Business Logic) chứ không phải tầng HTTP Router hay Middleware.
+## 🛠️ II. Thực Hành TDD với Node.js & Express: Mô Hình Service Layer
 
-**Giả định Setup:**
-*   Chúng ta đang sử dụng **Jest** làm framework testing (rất phổ biến trong cộng đồng Node.js).
-*   Code của chúng ta sẽ nằm trong `src/services/user.service.js`.
-*   Tests sẽ nằm trong `__tests__/user.service.test.js`.
+Khi xây dựng REST API bằng Node.js/Express, theo góc độ của một QE Lead, tôi luôn khuyên bạn nên áp dụng kiến trúc nhiều lớp (Multi-layered Architecture). Chúng ta tách biệt rõ ràng: **Controller $\rightarrow$ Service $\rightarrow$ Repository (hoặc Data Access Object - DAO)**.
 
-### 🔴 Bước 1: Red - Viết Test Case Thất bại (Thiếu code)
+Việc này giúp chúng ta dễ dàng *mock* các dependency bên ngoài và chỉ tập trung kiểm thử logic thuần túy của tầng service mà không bị ảnh hưởng bởi HTTP request/response cycle.
 
-Chúng ta bắt đầu bằng việc định nghĩa hành vi mà UserService phải có: nó phải chấp nhận một object User và trả về đúng cấu trúc, đồng thời xử lý trường hợp user ID tồn tại.
+### Kịch bản ví dụ: Lấy thông tin User theo ID
+Chúng ta sẽ xây dựng chức năng lấy một người dùng theo ID. Yêu cầu nghiệp vụ: Nếu user tồn tại thì trả về; nếu không tồn tại, phải ném ra lỗi 404 Not Found với message rõ ràng.
 
-**File:** `__tests__/user.service.test.js`
+#### Bước 1: Chuẩn bị môi trường (Setup)
 
+Giả sử chúng ta đang dùng Jest làm framework testing và đã có cấu trúc dự án cơ bản. Chúng ta tập trung vào việc kiểm thử lớp service `UserService`.
+
+*   `src/services/user.service.js`: Lớp chứa logic nghiệp vụ.
+*   `test/unit/user.service.test.js`: File test case của chúng ta.
+
+#### Bước 2: 🔴 Red - Viết Test và Thấy Nó Thất Bại (The Failure)
+
+Chúng ta viết bài kiểm thử cho trường hợp user không tồn tại (Edge Case). Lúc này, `UserService` chưa được định nghĩa đầy đủ, nên code sẽ thất bại.
+
+**File:** `test/unit/user.service.test.js`
 ```javascript
-// Đây là đoạn code test ban đầu của Duy Trung
-const userService = require('../src/services/user.service');
+// Giả định chúng ta đã mock tầng database client
+const userService = require('../../src/services/user.service');
+const dbClientMock = require('db-mock'); 
 
-describe('UserService - User Management', () => {
+describe('UserService: Get User By ID', () => {
+    
+    it('should throw a specific error if the user ID does not exist (404)', async () => {
+        // Arrange: Thiết lập mock database để trả về null/undefined khi tìm kiếm
+        dbClientMock.findUserById.mockResolvedValue(null); 
 
-    // Test Case 1: Tạo user thành công (Expect successful creation)
-    it('should successfully create a new user and return the unique ID', async () => {
-        // Giả lập DB call, nhưng ta viết test trước!
-        const userData = { name: 'Alice', email: 'alice@example.com' };
-        const result = await userService.createUser(userData); 
+        const userId = 'non-existent-id';
 
-        expect(result).toBeDefined();
-        expect(typeof result.id).toBe('string'); // Xác nhận rằng ID được trả về là chuỗi
-    });
-
-    // Test Case 2: Thất bại khi email đã tồn tại (Handling unique constraint)
-    it('should throw an error if the email is already in use', async () => {
-        const userData = { name: 'Bob', email: 'bob@example.com' };
-        
-        // Jest cú pháp để kiểm tra exception/error
-        await expect(userService.createUser(userData)).rejects.toThrow('Email conflict'); 
-    });
-
-    // Test Case 3: Kiểm tra trường hợp input không hợp lệ (Validation)
-    it('should throw an error if the name is missing', async () => {
-        const invalidData = { email: 'invalid@example.com' }; // Thiếu name
-        await expect(userService.createUser(invalidData)).rejects.toThrow('Name is required');
+        // ACT & ASSERT: Chúng ta mong đợi một lỗi tùy chỉnh (custom error)
+        await expect(async () => {
+            await userService.getUserById(userId);
+        }).rejects.toThrow('User not found with ID: non-existent-id'); 
     });
 });
-
-// Chạy thử lúc này, kết quả là 🔴 FAIL! (Vì chưa có hàm userService.createUser nào được định nghĩa)
 ```
 
-### 🟢 Bước 2: Green - Viết Code Tối thiểu để Vượt qua Test
+> **Giải thích của Duy Trung:** Tại sao chúng ta phải bắt lỗi (`expect(...).rejects.toThrow(...)`)? Vì đây là một *yêu cầu nghiệp vụ* quan trọng, không chỉ đơn thuần là kiểm tra xem hàm có chạy hay không. Chúng ta xác định rõ hành vi sai (behavior) mong muốn khi API gặp vấn đề để đảm bảo tính nhất quán của hệ thống.
 
-Bây giờ chúng ta quay sang viết code trong `src/services/user.service.js` chỉ để các test trên màu xanh lá. Chúng ta phải giải quyết cả ba vấn đề: tạo user, xử lý trùng email, và validation name.
+#### Bước 3: 🟢 Green - Viết Code Tối Thiểu Để Test Chạy Xanh (The Pass)
+
+Bây giờ, chúng ta chỉ quan tâm đến việc làm cho bài test trên chuyển sang màu xanh. Chúng ta cần triển khai `getUserById` trong `user.service.js`.
 
 **File:** `src/services/user.service.js`
-
 ```javascript
-// Lưu ý: Đây là phiên bản tối thiểu nhất!
-const usersDatabase = new Map(); // Giả lập DB in-memory
+const dbClient = require('../data/db-client'); // Tầng truy cập dữ liệu thực tế
 
 /**
- * Hàm này phải passing cả 3 test ở trên.
+ * Lấy thông tin người dùng bằng ID, ném lỗi 404 nếu không tìm thấy.
  */
-const createUser = async (userData) => {
-    // Bước A: Validation (Giải quyết Test Case 3)
-    if (!userData.name || userData.name.trim() === '') {
-        throw new Error('Name is required');
+async function getUserById(userId) {
+    // Đây là logic tối thiểu để vượt qua test Red ở trên
+    const user = await dbClient.findUserById(userId); 
+
+    if (!user) {
+        // Bắt buộc phải throw một lỗi có message chính xác như trong test case
+        throw new Error(`User not found with ID: ${userId}`); 
     }
 
-    // Bước B: Kiểm tra ràng buộc duy nhất (Unique constraint - Giải quyết Test Case 2)
-    const existingUser = [...usersDatabase.values()].find(u => u.email === userData.email);
-    if (existingUser) {
-        throw new Error('Email conflict');
-    }
-
-    // Bước C: Logic nghiệp vụ và trả kết quả (Giải quyết Test Case 1)
-    const newUser = { id: `user-${Date.now()}`, ...userData };
-    usersDatabase.set(newUser.id, newUser);
-
-    return { id: newUser.id, message: 'User created successfully' };
-};
-
-
-module.exports = {
-    createUser // Chỉ export hàm cần test
-};
-```
-Sau khi commit code trên, bạn chạy lại Jest. Kết quả sẽ là 🟢 PASS! Tuyệt vời!
-
-### 🟡 Bước 3: Refactor - Tối ưu hóa và Hoàn thiện Code (Bản Chất của QE)
-
-Hiện tại, code đã qua được kiểm thử, nhưng nó *rất xấu* (Bad Code). Nếu chúng ta để thế này, khi team khác chạm vào sẽ rất khó hiểu. Nhiệm vụ của tôi với tư cách là QE Lead là làm cho code tốt hơn.
-
-**Vấn đề cần Refactor:**
-1.  Database simulation (`usersDatabase`) đang được khai báo ở phạm vi toàn cục, gây ra vấn đề trạng thái (Statefulness) giữa các lần test.
-2.  Logic kiểm tra và tạo user bị trộn lẫn, không rõ ràng.
-
-**Giải pháp Tối ưu (Refactored Code):**
-Chúng ta sẽ tách lớp logic nghiệp vụ ra khỏi nơi lưu trữ giả lập để đảm bảo tính độc lập của unit test.
-
-```javascript
-// File: src/services/user.service.js - Bản Refactor Cuối cùng
-const usersDatabase = new Map(); // Vẫn giữ, nhưng phải cách ly nó
-
-/**
- * Lớp UserService giúp quản lý toàn bộ logic liên quan đến người dùng.
- */
-class UserService {
-    constructor(database) {
-        this.db = database || usersDatabase; // Dependency Injection (DI) là Best Practice
-    }
-
-    async createUser({ name, email }) {
-        // 1. Validation: Sử dụng class/utility riêng để xử lý validation logic
-        if (!name || !email) {
-            throw new Error('Name and Email are required');
-        }
-        
-        // 2. Business Rule check (Unique constraint)
-        const existingUser = [...this.db.values()].find(u => u.email === email);
-        if (existingUser) {
-            throw new DomainError('Email conflict', 'EMAIL_ALREADY_TAKEN'); // Sử dụng Domain Error thay vì Error chung
-        }
-
-        // 3. Creation logic
-        const newUser = { id: `user-${Date.now()}`, name, email };
-        this.db.set(newUser.id, newUser);
-
-        return { id: newUser.id, message: 'User created successfully' };
-    }
+    return user;
 }
 
-// Export một phiên bản instance đã được thiết lập sẵn để dễ sử dụng
-module.exports = new UserService(); 
+module.exports = {
+    getUserById,
+};
+```
+*(Sau khi viết code này và chạy lại Jest, mọi thứ đều chuyển sang màu xanh lá cây.)*
 
+#### Bước 4: ✨ Refactor - Tái Cấu Trúc Để Mã Sạch Hơn (The Clean)
 
-// ************ Giải thích của Duy Trung về Refactoring: **************
-/* 
-Tại sao tôi phải làm những thay đổi này?
-1. Dependency Injection (DI): Thay vì chỉ dùng biến toàn cục, việc truyền `database` vào constructor là Best Practice. Điều này giúp khi chúng ta chạy unit test, ta có thể "giả lập" một database sạch sẽ cho mỗi lần test mà không sợ bị ảnh hưởng bởi state của các test trước đó.
-2. Class Structure: Thay vì chỉ là hàm thuần túy, việc đóng gói logic vào Class `UserService` làm tăng tính module và giúp chúng ta dễ dàng thêm các phương thức khác (ví dụ: `getUserById(id)`) sau này mà không gây xung đột.
-3. Xử lý lỗi chuyên biệt (`DomainError`): Thay vì dùng `throw new Error(...)`, tôi thay thế bằng một lớp Exception tùy chỉnh. Trong kiến trúc API thực tế, việc biết chính xác loại lỗi (Validation error, Auth error, Domain conflict) giúp tầng Controller/Middleware xử lý response HTTP code chuẩn hơn (ví dụ: 409 Conflict).
-*/
+Code của chúng ta đang hoạt động đúng theo test. Bây giờ là lúc chúng ta nâng cấp chất lượng mã nguồn mà không phá vỡ bất kỳ bài test nào.
+
+Trong ví dụ trên, việc ném `new Error()` trực tiếp là chưa đủ chuyên nghiệp cho một API. Chúng ta nên định nghĩa các lớp lỗi (Custom Errors) riêng biệt để Controller có thể bắt và chuyển thành HTTP Status Code chuẩn xác hơn (ví dụ: 404).
+
+**Cải tiến Refactoring:**
+
+1.  Tạo `HttpError` class.
+2.  Sửa Service layer để ném `HttpNotFoundError`.
+
+```javascript
+// src/utils/http-error.js
+class HttpError extends Error {
+    constructor(message, status = 500) {
+        super(message);
+        this.status = status;
+        this.name = 'HttpError';
+    }
+}
+module.exports = HttpError;
+
+// src/services/user.service.js (Đã Refactor)
+const dbClient = require('../data/db-client'); 
+const HttpError = require('../utils/http-error'); // Import custom error
+
+async function getUserById(userId) {
+    const user = await dbClient.findUserById(userId); 
+
+    if (!user) {
+        // Thay thế new Error() bằng Custom HttpError, giúp tầng cao hơn xử lý tốt hơn
+        throw new HttpError(`User not found with ID: ${userId}`, 404); 
+    }
+
+    return user;
+}
+module.exports = { getUserById };
 ```
 
-## ✨ III. TDD Nâng Cao dành cho QE Lead: Những điểm cần lưu ý khi phát triển API thực tế
+> **Lợi ích của Refactoring:** Chúng ta đã nâng cấp code từ "chạy được" thành **"có thể bảo trì và mở rộng dễ dàng"**. Nếu sau này cần thêm chức năng kiểm tra quyền truy cập (Authorization), chúng ta chỉ cần chèn logic vào Service layer, và các test case cũ vẫn đảm bảo nó hoạt động đúng.
 
-Khi bạn đã thuần thục chu trình Red-Green-Refactor, hãy nâng cấp tầm nhìn của mình lên hai khía cạnh sau:
+---
 
-### 1. Testing Dependencies (Mocking)
-Trong một REST API thực tế, `UserService` sẽ không tự truy cập database hay gọi microservices bên ngoài. Nó phải *nhận* dependency đó như một tham số (Database Client, HTTP Client).
+## 🚀 III. Tổng kết: TDD là Tư Duy Thiết Kế
 
-**Nguyên tắc Golden Rule:** Trong Unit Test, bạn **phải Mock** mọi thứ nằm ngoài phạm vi kiểm thử hiện tại của mình.
+Đối với một QE Lead như tôi, việc áp dụng TDD không phải là một nhiệm vụ kỹ thuật riêng lẻ mà là một **Triết lý Thiết kế (Design Philosophy)**.
 
-*   **Tình huống:** `userService.createUser(data)` cần gọi DBClient để save dữ liệu.
-*   **Cách làm đúng (Test):** Thay vì để hàm này thực sự gọi DBClient, ta dùng `jest.fn()` để tạo một phiên bản giả lập (`mockDbClient`). Test sẽ khẳng định rằng: "Hàm `createUser` đã *cố gắng* gọi phương thức `saveUser` của mockDbClient với đúng dữ liệu đầu vào."
-*   **Lợi ích:** Tăng tốc độ test lên đáng kể, và đảm bảo rằng lỗi không phải do kết nối mạng hay cấu hình DB.
+Bạn sẽ thấy rằng khi bạn thực sự buộc bản thân phải viết test trước, bộ não của bạn sẽ tự động bắt đầu suy nghĩ về:
 
-### 2. Phân biệt Unit Test vs. Integration Test
-Là một QE Lead, bạn cần biết khi nào nên dừng viết Unit Test và bắt đầu Integration Test.
+1.  **Trường hợp biên (Edge Cases):** Xử lý input rỗng, dữ liệu null, ID không định dạng đúng...
+2.  **Các giới hạn:** Giới hạn tốc độ API (rate limiting), gián đoạn kết nối mạng.
+3.  **Khả năng Mocking:** Làm sao để tầng service này hoạt động mà không cần phải khởi động cả hệ thống database thực tế?
 
-| Loại Test | Mục tiêu Kiểm thử | Phạm vi Ảnh hưởng (Scope) | Công cụ Testing Phù hợp |
-| :--- | :--- | :--- | :--- |
-| **Unit Test** | Logic nghiệp vụ đơn lẻ, hàm thuần túy (Pure Function). | Chỉ một module/hàm. | Jest (`await` và `mock`) |
-| **Integration Test** | Tương tác giữa nhiều thành phần: Service $\rightarrow$ Repository $\rightarrow$ DB Client. | Nhiều lớp kết nối với nhau. | Supertest + Kết nối DB thật (hoặc Dockerized test DB). |
+Những suy nghĩ này chính là những khu vực rủi ro tiềm ẩn của ứng dụng, và TDD đã giúp bạn vá chúng trước khi sản phẩm đến tay người dùng cuối.
 
-TDD giúp bạn viết Unit Tests cực mạnh, và sau đó khi cần sự tin cậy tuyệt đối, các bài Integration Test sẽ xác nhận xem toàn bộ luồng dữ liệu có hoạt động trơn tru hay không.
+### Lời khuyên từ Duy Trung:
+*   **Bắt đầu nhỏ:** Đừng cố áp dụng TDD cho toàn bộ API ngay lập tức. Hãy bắt đầu với những module phức tạp nhất hoặc những nơi có logic nghiệp vụ (business logic) quan trọng nhất.
+*   **Phân tách rõ ràng:** Luôn kiểm thử Service Layer và Repository Layer bằng Unit Test, giữ cho Controller/Route Handler chỉ chịu trách nhiệm về việc xử lý HTTP Request/Response duy nhất (Input validation & Output formatting).
 
-## 📝 Lời kết từ Duy Trung
-
+Chúc các anh chị và em xây dựng những hệ thống Node.js API không chỉ hoạt động tốt mà còn cực kỳ đáng tin cậy! Nếu có bất kỳ câu hỏi nào, đừng ngần ngại thảo luận thêm nhé.
