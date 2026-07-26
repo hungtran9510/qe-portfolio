@@ -1,7 +1,7 @@
 ---
 title: "Kiểm thử hiệu năng và độ chịu tải của WebSocket API thời gian thực với k6"
 date: 2026-02-21
-description: "Hướng dẫn chuyên sâu cách mô phỏng tải cao lên WebSocket bằng k6, đảm bảo tính ổn định và khả năng mở rộng cho các hệ thống thời gian thực."
+description: "Hướng dẫn chuyên sâu về cách sử dụng k6 để mô phỏng tải nặng, kiểm tra khả năng mở rộng và hiệu suất của các hệ thống WebSocket thời gian thực."
 tags: ["Performance","k6","WebSocket"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Hoàng Hiệp"
@@ -9,145 +9,167 @@ author: "Hoàng Hiệp"
 
 # Kiểm thử hiệu năng và độ chịu tải của WebSocket API thời gian thực với k6
 
-Chào các đồng nghiệp Quality Engineering, tôi là Hoàng Hiệp. Trong kỷ nguyên số hóa hiện nay, việc xử lý dữ liệu theo thời gian thực (real-time) đã trở thành yêu cầu bắt buộc đối với hầu hết các ứng dụng hiện đại—từ giao dịch tài chính đến trò chuyện trực tuyến và IoT. WebSocket API chính là xương sống của những hệ thống này, mang lại hiệu suất vượt trội so với kiến trúc HTTP truyền thống qua cơ chế kết nối bán hai chiều (full-duplex).
+*Từ Góc Nhìn của Một QE Lead – Hoàng Hiệp*
 
-Tuy nhiên, đi kèm với tính năng mạnh mẽ đó là một thách thức lớn trong kiểm thử chất lượng: **Làm thế nào để mô phỏng tải cao lên các kết nối duy trì trạng thái (stateful connections) như WebSocket?**
+***
 
-Nếu bạn đang xây dựng hoặc bảo trì một hệ thống thời gian thực và chưa có quy trình kiểm thử hiệu năng nghiêm ngặt, bài viết này dành cho bạn. Chúng ta sẽ cùng nhau tìm hiểu cách sử dụng công cụ k6 mạnh mẽ để tiến hành các bài kiểm tra tải (Load Testing) và độ chịu tải (Stress Testing) chuyên sâu cho WebSocket API.
+## 🚀 Lời Mở Đầu: Tại Sao WebSocket Cần Được Kiểm Tra Nghiêm Túc?
 
----
+Chào các bạn kỹ sư Chất lượng!
 
-## 📘 I. Tại sao phải quan tâm đến Performance của WebSocket?
+Trong kỷ nguyên mà trải nghiệm người dùng (UX) phải là thời gian thực, WebSocket (WS) đã trở thành xương sống của nhiều ứng dụng hiện đại—từ các bảng giá chứng khoán trực tiếp, trò chơi multiplayer online, đến hệ thống thông báo tức thời. WS cho phép giao tiếp bán hai chiều qua một kết nối duy nhất, loại bỏ được độ trễ đáng kể so với REST truyền thống.
 
-Khi chúng ta nói về hiệu năng của một API REST, người ta thường đo lường bằng thời gian phản hồi trung bình (Average Response Time). Nhưng với WebSocket, chúng ta đối mặt với các metric phức tạp hơn:
+Tuy nhiên, "hiệu suất cao" (High Performance) và "thời gian thực" (Real-time) đi kèm với những thách thức khổng lồ về mặt kỹ thuật. Khi hệ thống của bạn phải đối mặt với hàng ngàn, thậm chí hàng triệu kết nối duy trì trạng thái liên tục, việc chỉ kiểm thử chức năng (Functional Testing) là hoàn toàn không đủ.
 
-1. **Khả năng kết nối đồng thời (Concurrent Connections):** Hệ thống có thể duy trì hàng ngàn, thậm chí hàng chục nghìn phiên kết nối mà không bị rò rỉ bộ nhớ (memory leak) hay quá tải tài nguyên hệ điều hành?
-2. **Throughput của tin nhắn:** Khi luồng dữ liệu lớn (ví dụ: giá chứng khoán thay đổi liên tục), tốc độ xử lý và gửi tin nhắn có duy trì được dưới áp lực cao không?
-3. **Tính ổn định khi chịu tải đột biến (Stress Tolerance):** Khi số lượng người dùng nhảy từ 10 lên 10,000 trong vài giây, hệ thống có thể xử lý việc cấp phát tài nguyên nhanh chóng và ổn định không?
+Bạn cần một công cụ mạnh mẽ để mô phỏng áp lực thực tế: đó chính là **k6**.
 
-Các bài kiểm thử hiệu năng thông thường chỉ tập trung vào luồng dữ liệu qua HTTP. Nếu bỏ qua WebSocket, bạn đang đánh lừa bản thân về khả năng chịu tải thực tế của hệ thống.
+Bài viết này sẽ là hướng dẫn chuyên sâu nhất của tôi về cách sử dụng k6 để không chỉ kiểm tra khả năng chịu tải mà còn đo lường độ ổn định và hiệu suất *thực thụ* của WebSocket API.
 
-## 💡 II. Nguyên tắc hoạt động của k6 với WebSocket
+## 💡 I. Cơ Sở Lý Thuyết: Kiểm Thử Hiệu Năng WS Khác Với HTTP Thế Nào?
 
-k6 là công cụ kiểm thử tải mã nguồn mở rất mạnh mẽ, được xây dựng trên Go và sử dụng JavaScript (WebAssembly) cho các script test. Về cơ bản, khi bạn test REST API bằng k6, nó gửi một yêu cầu HTTP và chờ phản hồi.
+Khi ta nói đến Load Testing cho WebSocket, chúng ta không chỉ đơn thuần là gửi yêu cầu (request) rồi chờ phản hồi (response). Chúng ta đang mô phỏng một vòng đời kết nối phức tạp hơn nhiều.
 
-Với WebSocket, quá trình sẽ phức tạp hơn:
+### 1. Các Yếu Tố Cần Tập Trung Kiểm Tra:
 
-1. **Thiết lập Kết nối:** Client phải thực hiện bắt tay (handshake) qua giao thức HTTP để nâng cấp kết nối sang WS/WSS.
-2. **Duy trì Trạng thái:** Sau khi thiết lập, k6 phải giữ phiên WebSocket này sống và lắng nghe các tin nhắn từ Server.
-3. **Gửi Tin nhắn Chủ động:** Trong quá trình test, k6 sẽ chủ động gửi các payload (tin nhắn) theo một mô hình tải đã định trước.
+*   **Khả năng mở rộng Kết nối (Connection Scaling):** Hệ thống có thể duy trì hàng ngàn/hàng chục nghìn kết nối WS *đồng thời* hay không, và liệu việc mở/đóng kết nối có bị tắc nghẽn tài nguyên hệ điều hành (resource exhaustion) không?
+*   **Thông lượng Tin nhắn (Throughput):** Sau khi kết nối được thiết lập, tốc độ tối đa mà server có thể xử lý và gửi đi các gói tin dữ liệu là bao nhiêu (ví dụ: 100 tin/giây/kết nối)?
+*   **Độ trễ Kết nối (Connection Latency):** Thời gian để một client từ lúc cố gắng kết nối đến khi nhận được thông báo "Connected" phải nằm trong ngưỡng chấp nhận được.
+*   **Khả năng chịu tải gián đoạn (Resilience):** Điều gì xảy ra khi server gặp sự cố nhỏ, hoặc khi mạng bị rớt và cần tái kết nối (reconnect logic)?
 
-k6 hỗ trợ native Websockets API cho phép chúng ta thực hiện chính xác chu trình này mà không cần dùng đến thư viện bên thứ ba phức tạp nào.
+### 2. Tại sao k6 là lựa chọn tối ưu?
 
-## 🛠️ III. Hướng dẫn Thực hành: Viết Test Script k6 WebSocket
+k6 (viết bằng Go và sử dụng JavaScript để viết test script) được thiết kế với hiệu suất cao, khả năng song song tuyệt vời và cú pháp viết test cực kỳ dễ đọc. Điều này giúp chúng ta tập trung vào logic kiểm thử thay vì lo lắng về việc quản lý tài nguyên của công cụ.
 
-Hãy cùng xem một ví dụ cụ thể về việc kiểm thử khả năng duy trì kết nối và xử lý luồng tin nhắn trên một WebSocket API giả định của chúng ta (ví dụ: `ws://localhost:8080/livefeed`).
+## 🛠️ II. Hướng Dẫn Thực Hành: Viết Test Script WebSocket bằng k6
 
-### 1. Thiết lập k6 Test Script (`websocket_test.js`)
+Để kiểm thử WS với k6, chúng ta sẽ cần sử dụng các thư viện hỗ trợ WebSockets trong môi trường JavaScript/Go của k6. Về cơ bản, logic test phải mô phỏng một *vòng lặp sống* (persistent loop) thay vì chỉ là một request-response đơn lẻ.
+
+### 1. Cài đặt và Chuẩn bị Môi trường
+
+Đảm bảo bạn đã cài đặt k6:
+```bash
+brew install k6 # Hoặc theo tài liệu chính thức của k6
+```
+
+Giả sử chúng ta có một API WS mẫu chạy tại `ws://localhost:8080/ws/user/123`.
+
+### 2. Code Mẫu (WebsocketLoadTest.js)
+
+Đây là đoạn code mô phỏng quy trình kết nối, duy trì trạng thái lắng nghe và gửi tin nhắn liên tục trong vòng thử nghiệm.
 
 ```javascript
-import { check, sleep } from 'k6';
-import { WebSocket } from 'k6/experimental/websocket';
+// websocket_load_test.js
+import { WebSocketClient } from 'k6/x/webws'; // Giả định thư viện WS cho k6
 
-// --- Cấu hình Kịch bản (Scenario) ---
 export default function () {
-    const ws = new WebSocket('ws://localhost:8080/livefeed');
-
-    // 1. Bắt đầu lắng nghe kết nối và xử lý sự kiện mở
-    ws.on('open', () => {
-        console.log(`[INFO] Connection established successfully.`);
-        // Sau khi kết nối thành công, ta gửi tin nhắn "join" để đăng ký kênh dữ liệu
-        ws.send(JSON.stringify({ action: 'subscribe', channel: 'stock_updates' }));
+    const ws = new WebSocketClient('ws://localhost:8080/ws/realtime');
+    let connectionSuccessful = false;
+    
+    // 1. Thiết lập sự kiện khi kết nối thành công (Open)
+    ws.onopen(() => {
+        console.log("✅ Kết nối WS thành công.");
+        connectionSuccessful = true;
+        // Gửi tin nhắn đăng ký hoặc xác thực ban đầu
+        ws.send(JSON.stringify({ action: "subscribe", topic: "price_feed" }));
     });
 
-    // 2. Xử lý sự kiện nhận dữ liệu (Server gửi)
-    ws.on('message', (data) => {
-        // Kiểm tra định dạng và nội dung tin nhắn phản hồi từ Server
-        try {
-            const message = JSON.parse(data.toString());
-            check(message, { 'Message format is valid': true });
-            console.log(`[RECEIVED] Data: ${JSON.stringify(message)}`);
-        } catch (e) {
-            // Xử lý trường hợp data không phải JSON
-            console.error(`Failed to parse message: ${data}`);
+    // 2. Xử lý nhận dữ liệu (Message)
+    ws.onmessage((event) => {
+        const data = JSON.parse(event.data);
+        // Ở đây, ta chỉ cần xác nhận rằng việc nhận dữ liệu diễn ra mượt mà
+        if (data.type === "heartbeat") {
+            console.log(`[Heartbeat] Nhận tại ${new Date().toISOString()}`);
+        } else {
+             console.log(`[Dữ liệu WS] ${JSON.stringify(data)}`);
         }
     });
 
-    ws.on('close', () => {
-        console.log('[INFO] Connection closed.');
+    // 3. Xử lý lỗi (Error) và đóng kết nối (Close)
+    ws.onerror((err) => {
+        console.error("❌ Lỗi kết nối WebSocket:", err);
+        // Trong môi trường thực tế, cần thêm logic thử reconnect ở đây!
     });
 
-    // 3. Giữ kết nối hoạt động và mô phỏng hành vi của người dùng
-    // Trong k6, việc gọi sleep() sẽ giữ worker chờ cho đến khi hết thời gian đó.
-    sleep(2); 
+    // Logic chính: Vòng lặp gửi tin nhắn và duy trì sống
+    // Chúng ta sẽ chạy vòng lặp này cho đến khi k6 kết thúc tải.
+    while (connectionSuccessful) {
+        try {
+            // Mô phỏng việc định kỳ gửi các gói tin keep-alive hoặc dữ liệu user.
+            const messageToSend = JSON.stringify({ 
+                action: "keep_alive", 
+                timestamp: Date.now() 
+            });
+            ws.send(messageToSend);
+
+            // Tạm dừng để không làm quá tải CPU/Resource của máy chạy test
+            sleep(1); // Chờ 1 giây trước khi gửi tin tiếp theo
+        } catch (e) {
+            // Nếu xảy ra lỗi trong vòng lặp, thoát khỏi luồng xử lý.
+            console.error("Lỗi trong vòng lặp WS:", e);
+            break;
+        }
+    }
+
+    // 4. Dọn dẹp kết nối khi hoàn thành test case
+    ws.close();
 }
 
 
-// --- Định nghĩa Load Test (Options) ---
-export const options = {
-    scenarios: [
-        {
-            name: 'WebSocket_Load',
-            executor: 'constant-vus,constant-time', // Giữ hằng số người dùng và thời gian
-            vus: 500,     // Số lượng Virtual Users (Người dùng ảo): 500 kết nối đồng thời
-            duration: '2m', // Thời gian chạy test: 2 phút
+export let options = {
+    vus: 50,             // Số lượng người dùng ảo (Virtual Users) - Bắt đầu với con số nhỏ
+    duration: '30s',    // Thời gian chạy thử nghiệm
+    ext: {
+        loadimpact: {
+            // Cấu hình thêm cho các kịch bản phức tạp hơn (ví dụ: gradient ramp-up)
         }
-    ],
-    thresholds: {
-        'http_req_failed': ['rate<0.01'],      // Tỷ lệ lỗi (lỗi WebSocket) < 1%
-        'ready': ['(' + 0 + ')']                // Đảm bảo tất cả VUs đã sẵn sàng kết nối
     }
 };
 ```
 
-### 2. Giải thích Chi tiết của Hoàng Hiệp về Code Script
+***(Chú thích của Hoàng Hiệp):*** *Bạn thấy đấy, sự khác biệt cốt lõi ở đây không phải là việc gửi một request duy nhất, mà là việc thiết lập cả một **hệ thống lắng nghe (listener)** và một **vòng lặp liên tục (continuous loop)**. `ws.onmessage` cho phép chúng ta xử lý bất kỳ dữ liệu nào đến từ server (giả định đây là kịch bản bạn muốn test throughput của nó), trong khi vòng `while` mô phỏng hành vi client chủ động gửi keep-alive.*
 
-#### A. Sử dụng `WebSocket` API (Quan trọng nhất)
+## ✨ III. Các Kỹ Thuật Nâng Cao và Best Practices
 
-Thay vì sử dụng các hàm HTTP tiêu chuẩn, chúng ta phải import và sử dụng lớp `WebSocket` được cung cấp bởi k6. Điều này cho phép script của chúng ta mô phỏng chính xác giao thức WebSocket.
+Để bài kiểm thử mang tính học thuật và ứng dụng cao nhất, chúng ta cần vượt qua mức cơ bản:
 
-#### B. Xử lý sự kiện (`ws.on('open')`, `ws.on('message')`)
+### 1. Tăng cường Xử lý Tái Kết nối (Resilience Testing)
 
-Đây là phần cốt lõi trong kiểm thử thời gian thực. Trong thế giới thực, kết nối chỉ xảy ra *sau khi* người dùng truy cập trang. Chúng ta không thể biết chính xác bao giờ Server đã sẵn sàng. Do đó, chúng ta phải sử dụng các trình lắng nghe sự kiện (event listeners):
+Trong thực tế, kết nối WS rất dễ bị ngắt (network hiccup). Một kịch bản test chuyên nghiệp phải mô phỏng điều này.
 
-*   **`ws.on('open', ...)`:** Khi kết nối được thiết lập thành công (handshake pass), chúng ta phải thực hiện hành vi đầu tiên của người dùng—thường là gửi một tin nhắn đăng ký kênh (ví dụ: `{ action: 'subscribe' }`).
-*   **`ws.on('message', ...)`:** Đây là nơi dữ liệu đến từ Server. Chúng ta *bắt buộc* phải bao gồm logic `check()` và xử lý lỗi (`try-catch`) tại đây để xác minh rằng các payload nhận được có đúng định dạng, không bị mất mát, và không gây ra sự cố trong luồng kiểm thử.
+**Cách làm:** Thay vì chỉ gọi `ws.close()`, bạn nên bọc toàn bộ logic trong một hàm xử lý try-catch và thêm cơ chế *Exponential Backoff* cho việc kết nối lại.
+*   **Mục tiêu đo lường:** Thời gian phục hồi (Recovery Time) của hệ thống sau khi gián đoạn mạng hoặc server bị khởi động lại tạm thời.
 
-#### C. Mô hình Tải (The Load Model)
+### 2. Stress Testing (Kiểm thử Quá tải)
 
-Trong script trên, chúng ta sử dụng `sleep(2)` kết hợp với việc lắng nghe tin nhắn. Điều này ngụ ý rằng sau khi thiết lập kết nối và đăng ký kênh, người dùng sẽ hoạt động thụ động, chờ dữ liệu cập nhật trong 2 giây trước khi vòng lặp tiếp theo bắt đầu (hoặc đợi đến hết thời gian `duration`).
+Stress Test là ép hệ thống vượt qua giới hạn hoạt động bình thường của nó để tìm ra *điểm gãy* (breaking point).
 
-**Lưu ý quan trọng:** Khi bạn test WebSocket, không phải mọi yêu cầu đều là HTTP Request. Metric chính của bạn là **Số lượng kết nối duy trì được (Concurrent Connections)** và **Thông lượng tin nhắn tối đa (Max Throughput/Message Rate)**. k6 sẽ tự động tính toán các chỉ số này khi script chạy ổn định.
+**Cách làm:** Tăng dần số lượng `vus` (Virtual Users) trong k6 Script và chạy liên tục.
+1.  Bắt đầu với 10 vus.
+2.  Tăng lên 50, sau đó là 100, ... cho đến khi bạn thấy các chỉ số như *Error Rate* hoặc *Latency* tăng đột biến.
+3.  Điểm mà hiệu suất bắt đầu suy giảm không phải là giới hạn chịu tải, mà là nơi bạn cần tối ưu hóa tài nguyên của server.
 
-## 🚀 IV. Những Lưu ý Nâng cao cho QE Lead
+### 3. Phân tích Metrics (Những Chỉ Số Không Được Bỏ Qua)
 
-Là một chuyên gia chất lượng, tôi không chỉ dừng lại ở việc chạy test mà còn quan tâm đến cách bạn *thiết kế* và *phân tích* bài test. Dưới đây là ba mẹo nâng cao:
+Sau khi chạy k6, bảng báo cáo rất quan trọng. Với WS API, tôi đặc biệt chú ý đến:
 
-### 1. Mô phỏng Hồi quy Kết nối (Connection Flapping)
-Trong thực tế, kết nối WebSocket có thể bị ngắt bởi các yếu tố mạng hoặc server cần refresh token. Một test case mạnh mẽ phải mô phỏng hành vi **Tự phục hồi** (Self-recovery).
+| Metric | Ý nghĩa trong bối cảnh WS | Giá trị lý tưởng |
+| :--- | :--- | :--- |
+| **Latency (Average)** | Độ trễ nhận tin nhắn từ server/giữa các bước xử lý. | Càng gần 0 càng tốt (miligiây thấp). |
+| **Throughput (msgs/s)** | Số lượng thông báo tối đa mà hệ thống có thể luân chuyển. | Phải vượt xa nhu cầu dự kiến của business. |
+| **Error Rate** | Tỉ lệ lỗi kết nối, timeout, hoặc lỗi xử lý dữ liệu trên client side. | Bằng 0%. |
+| **Connection Count** | (Metrics từ Monitoring Tool) Số lượng WS tối đa được duy trì thành công trong thời gian test. | Phải bằng với `vus` và ổn định. |
 
-*   **Cách làm:** Viết một cơ chế `retry` thủ công trong JavaScript: Nếu phát hiện sự kiện `close`, sau 3 giây, hãy thử gọi lại hàm kết nối và tái đăng ký kênh.
-*   **Mục tiêu kiểm test:** Xác minh rằng khi API bị ngắt và reconnect, nó vẫn có thể phục hồi trạng thái (state) mà không mất dữ liệu hoặc yêu cầu người dùng đăng nhập lại.
+## ✅ IV. Kết Luận: Tầm Quan Trọng Của QE Trong Hệ Thống Thời Gian Thực
 
-### 2. Kiểm thử Payload Biến đổi (Variable Payloads)
-Đừng bao giờ sử dụng một payload cố định cho toàn bộ bài test. Sự biến đổi của dữ liệu là yếu tố gây áp lực lớn nhất lên tầng xử lý và database.
+Kiểm thử hiệu năng cho WebSocket API không chỉ là chạy script và xem con số RPS (Requests Per Second). Nó là việc xác minh tính *ổn định*, *khả năng phục hồi* và *tốc độ truyền tải tối đa* của luồng dữ liệu theo thời gian.
 
-*   **Giải pháp:** Sử dụng hàm `SharedArray` hoặc cấu trúc dữ liệu phức tạp hơn trong k6 để luân phiên các payload khác nhau (ví dụ: 1/3 tin nhắn giá cổ phiếu, 1/3 tin nhắn thông báo giao dịch, 1/3 tin nhắn chat).
-*   **Mục tiêu:** Xác minh rằng logic parsing và xử lý dữ liệu của server hoạt động ổn định khi nhận nhiều loại cấu trúc dữ liệu khác nhau cùng lúc.
+Là một QE Lead, tôi luôn nhắc nhở đội ngũ rằng: Nếu API của bạn không hoạt động tốt khi dưới áp lực cao nhất, thì nó sẽ thất bại ngay khi có lượng người dùng đột biến vào dịp sale lớn hoặc sự kiện quan trọng.
 
-### 3. Tối ưu hóa Kịch bản Lặp lại (Scenario Optimization)
-Nếu ứng dụng của bạn có các hành vi đa dạng:
+Bằng việc sử dụng k6 và tư duy kiểm thử theo vòng đời kết nối (Connection Lifecycle Testing), chúng ta không chỉ tìm ra các nút thắt cổ chai về tài nguyên mà còn xây dựng được sự tự tin rằng sản phẩm sẽ hoạt động mượt mà, ổn định 24/7—yêu cầu bắt buộc của bất kỳ hệ thống thời gian thực nào.
 
-*   **Nhóm A:** Kết nối $\rightarrow$ Chỉ lắng nghe (Thụ động).
-*   **Nhóm B:** Kết nối $\rightarrow$ Gửi dữ liệu Periodically (Tương tác thường xuyên).
-*   **Nhóm C:** Kết nối $\rightarrow$ Tương tác nặng (Ví dụ: Chatroom có nhiều gửi/nhận liên tục).
+Chúc các bạn thành công trong việc đảm bảo chất lượng cho các giải pháp hiện đại!
 
-Bạn nên chia thành các kịch bản riêng biệt và kết hợp chúng bằng cú pháp `scenarios` trong k6. Điều này cho phép bạn cô lập được lỗi ở từng loại tải cụ thể, giúp debug chính xác hơn rất nhiều.
-
-## 🏆 Kết luận của Hoàng Hiệp
-
-Kiểm thử hiệu năng WebSocket không đơn thuần là việc chạy một con số VUs lớn lên API. Đó là quá trình mô phỏng hành vi phức tạp, duy trì trạng thái và kiểm tra khả năng phục hồi (resilience) dưới áp lực cực cao.
-
-Việc tích hợp các công cụ hiện đại như k6 vào pipeline CI/CD của bạn để thực hiện các bài test WebSocket sẽ giúp đội ngũ phát triển tự tin hơn rất nhiều khi tung sản phẩm ra thị trường, đặc biệt với những ứng dụng yêu cầu độ trễ (latency) thấp và tính sẵn sàng cao.
-
-Hãy bắt đầu từ những bước nhỏ nhất: Đảm bảo kịch bản của bạn bao gồm cả việc xử lý sự kiện `open`, `message` và `close`. Chúc các đồng nghiệp thành công trong hành trình đảm bảo chất lượng phần mềm!
+***
+**Hoàng Hiệp**
+*Quality Engineering Lead*
+*(Một góc nhìn về độ vững chắc của phần mềm)*
