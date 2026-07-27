@@ -1,7 +1,7 @@
 ---
 title: "Kiểm thử tích hợp Microservices bằng Contract Testing với Pact Framework"
 date: 2026-06-02
-description: "Khám phá cách sử dụng Pact Framework để chuyển từ kiểm thử tích hợp E2E chậm chạp sang Contract Testing nhanh, mạnh mẽ và đảm bảo độ ổn định cho kiến trúc Microservices."
+description: "Khám phá cách đảm bảo độ tin cậy của hệ thống microservice phức tạp bằng Contract Testing và Pact. Hướng dẫn chi tiết từ lý thuyết đến thực hành."
 tags: ["Contract Testing","Microservices","Pact"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Hồng Dung"
@@ -9,130 +9,191 @@ author: "Hồng Dung"
 
 # Kiểm thử tích hợp Microservices bằng Contract Testing với Pact Framework
 
-Chào các anh chị đồng nghiệp trong lĩnh vực Chất lượng Phần mềm! Tôi là Hồng Dung, và hôm nay chúng ta sẽ cùng nhau đi sâu vào một chủ đề mà bất kỳ đội ngũ phát triển kiến trúc Microservices nào cũng phải đối mặt: **Kiểm thử tích hợp (Integration Testing)**.
+Chào các đồng nghiệp trong lĩnh vực chất lượng phần mềm, tôi là Hồng Dung. Trong những năm qua, kiến trúc Microservices đã trở thành tiêu chuẩn vàng cho việc phát triển ứng dụng quy mô lớn, linh hoạt và khả năng mở rộng. Tuy nhiên, sự tự do và tính độc lập mà Microservices mang lại cũng đi kèm với một thách thức cực kỳ lớn: **Kiểm thử tích hợp (Integration Testing)**.
 
-Nếu bạn đang vận hành một hệ thống với hàng chục dịch vụ nhỏ độc lập (Microservices), chắc hẳn bạn đã trải qua cơn ác mộng của các bài kiểm thử End-to-End (E2E) dài ngoằng, giòn như thủy tinh và cực kỳ chậm chạp khi mỗi lần thay đổi dù là nhỏ nhất.
+Khi bạn có hàng chục, thậm chí hàng trăm service nhỏ tương tác với nhau qua các API, làm sao để đảm bảo rằng khi Service A cập nhật, nó không vô tình làm hỏng chức năng của Service B mà chưa hề kết nối thật?
 
-Bài viết này không chỉ là lý thuyết suông; nó là một hướng dẫn thực chiến chi tiết về cách chúng ta có thể chuyển đổi từ phương pháp E2E truyền thống sang **Contract Testing** bằng sức mạnh của **Pact Framework**.
-
-***
-
-## 💡 Tại sao Traditional Integration Testing thất bại trong Microservices?
-
-Trong kiến trúc Monolith, việc kiểm thử tích hợp là dễ dàng: bạn chỉ cần khởi động cả ứng dụng và gọi qua các tầng lớp. Nhưng khi chúng ta chuyển sang Microservices, sự phức tạp nhân lên theo cấp số nhân (exponential complexity).
-
-Một bài kiểm thử E2E điển hình có thể bao gồm chuỗi các cuộc gọi từ `Service A` $\rightarrow$ `API Gateway` $\rightarrow$ `Service B` $\rightarrow$ `Service C`, và yêu cầu trạng thái của cơ sở dữ liệu là phải nhất quán qua tất cả các bước.
-
-**Vấn đề cốt lõi (The Root Problem):**
-Khi bạn thay đổi một endpoint nhỏ trong `Service B` (ví dụ: tên trường JSON từ `user_id` thành `userId`), dù nó không ảnh hưởng đến logic kinh doanh của `Service A`, thì bài kiểm thử E2E lúc này sẽ **thất bại**, buộc đội ngũ phải mất hàng giờ để debug xem lỗi là do giao thức, hay do logic nghiệp vụ, hay chỉ đơn giản là một thay đổi nhỏ về Schema.
-
-Chúng ta cần một phương pháp giúp cô lập các rủi ro phụ thuộc (dependency risks) mà không cần khởi động cả hệ thống. Và đó chính là lúc **Contract Testing** xuất hiện.
+Đây chính là lúc **Contract Testing** bước vào cuộc chơi. Bài viết này, tôi sẽ dành trọn vẹn để giải mã cách triển khai phương pháp tiên tiến này bằng công cụ huyền thoại: **Pact Framework**.
 
 ***
 
-## 📜 Contract Testing là gì?
+## 💡 I. Vấn đề của Integration Testing trong Microservices (The Problem)
 
-### Định nghĩa:
-Contract Testing (Kiểm thử hợp đồng) là một kỹ thuật kiểm thử tích hợp đảm bảo rằng các dịch vụ khác nhau giao tiếp với nhau đúng theo những thỏa thuận đã được định nghĩa rõ ràng và mang tính chất hợp pháp – hay còn gọi là **hợp đồng (Contract)**.
+Trong kiến trúc Monolith, việc kiểm thử tích hợp thường được thực hiện bằng cách dựng lên một môi trường toàn diện (**End-to-End - E2E**), mô phỏng toàn bộ hệ thống đang hoạt động. Điều này rất tốn kém, chậm chạp và dễ bị lỗi "hầm lũy" (flaky tests) do phụ thuộc vào trạng thái của các service bên ngoài.
 
-Thay vì giả định mọi thứ sẽ hoạt động hoàn hảo khi cả hệ thống chạy, Contract Testing buộc chúng ta phải xác thực: *Dịch vụ A cần gì từ Dịch vụ B?* và *Liệu Dịch vụ B có đang cung cấp nó không?*
+Khi chuyển sang Microservices:
+1. **Sự Phụ Thuộc Lớn:** Service A phụ thuộc vào cấu trúc dữ liệu trả về từ Service B, và ngược lại.
+2. **Chi phí E2E Cao:** Để chạy một bộ test E2E hoàn chỉnh, bạn phải khởi động và duy trì toàn bộ các service liên quan (Database, Cache, Message Queue...). Điều này khiến vòng lặp CI/CD bị chậm đáng kể.
+3. **Không đảm bảo ràng buộc về API:** Một thay đổi nhỏ trong schema JSON của Service B có thể vô tình phá vỡ Service A, nhưng bạn chỉ phát hiện ra điều đó khi triển khai và chạy test E2E ở môi trường staging (quá muộn!).
 
-### Cơ chế hoạt động (Consumer-Driven):
-Điểm mấu chốt của Pact là tính chất **Consumer-Driven**. Nghĩa là, bên gọi API (`Consumer`) phải định nghĩa những gì họ kỳ vọng nhận được từ bên cung cấp API (`Provider`). Hợp đồng này sau đó sẽ được lưu lại dưới dạng một tệp tin JSON/YAML và sử dụng để kiểm thử độc lập.
-
-*   **Hồng Dung phân tích:** Hãy hình dung bạn là người mua hàng (Consumer) và `Service B` là cửa hàng (Provider). Bạn không cần phải vào xem toàn bộ cách vận hành của kho bãi (toàn bộ logic bên trong Service B); bạn chỉ cần biết rằng: "Tôi chắc chắn sẽ nhận được một sản phẩm có màu Đỏ, cỡ L." Contract Testing chính là việc xác minh bằng máy móc điều này.
+**Kết luận:** Chúng ta cần một cách kiểm thử tích hợp vừa nhanh chóng, vừa chính xác, mà không yêu cầu mọi service phải hoạt động cùng lúc. Giải pháp là Contract Testing.
 
 ***
 
-## 🛠️ Pact Framework hoạt động như thế nào? (Luồng thực chiến)
+## 🛡️ II. Contract Testing Là Gì? (The Concept)
 
-Pact quy trình kiểm thử tích hợp thành ba giai đoạn rõ ràng và độc lập, giúp tăng tốc độ CI/CD đáng kinh ngạc:
+**Contract Testing** là một kỹ thuật kiểm thử đảm bảo rằng các dịch vụ vi mô trao đổi dữ liệu giữa chúng luôn tuân thủ một "hợp đồng" (contract) đã được thỏa thuận từ trước. Thay vì test toàn bộ luồng nghiệp vụ, ta chỉ tập trung vào việc xác minh **API Call và API Response** theo hợp đồng đó.
 
-### Giai đoạn 1: Người Tiêu Thụ (Consumer) Định nghĩa Hợp đồng
-*   **Mục đích:** Xác định chính xác các request (endpoint, headers, body JSON...) mà Consumer cần từ Provider.
-*   **Thực hiện:** Chúng ta viết các bài kiểm thử Pact trong mã của ứng dụng Client/Consumer (`Service A`).
+### 🎯 Các thành phần chính:
+1. **Consumer (Người tiêu thụ):** Service gọi đến service khác (ví dụ: Frontend gọi đến `UserService`).
+2. **Provider (Nhà cung cấp):** Service được gọi đến và cung cấp dữ liệu (ví dụ: `UserService`).
+3. **The Contract:** Là một tài liệu định nghĩa chính xác các yêu cầu (Request) mà Consumer gửi tới Provider, và cách thức Provider phải phản hồi (Response).
 
-**Ví dụ Giả lập (Java/Kotlin):**
-Giả sử `Service A` gọi API `/users/{id}` của `Service B`.
+### ✨ Pact Framework hoạt động thế nào?
+Pact cho phép chúng ta biến hóa quá trình kiểm thử tích hợp phức tạp thành quy trình hai bước đơn giản:
 
+1. **Consumer Test (Viết Hợp Đồng):** Service Consumer viết các bài test, và trong mỗi test, nó sử dụng thư viện Pact để *ghi lại* những cuộc gọi API mà nó thực hiện với một dịch vụ giả lập (**Mock Provider**) cùng với payload tương ứng. Output của bước này là file "Pact JSON".
+2. **Provider Test (Xác Minh Hợp Đồng):** Service Provider nhận các file Pact JSON từ tất cả Consumers của mình. Nó sau đó chạy bộ test bằng cách tự mô phỏng việc thực hiện API theo chính xác những gì được ghi trong Pact JSON. Nếu Provider không thể trả về dữ liệu khớp với Contract, thì Service Provider đó đã bị lỗi và quá trình build sẽ thất bại **ngay lập tức**.
+
+***
+
+## 🛠️ III. Hướng dẫn Thực chiến với Pact Framework (Implementation)
+
+Giả sử chúng ta có hai service:
+*   **`OrderService` (Consumer):** Cần lấy thông tin người dùng từ Service B.
+*   **`UserService` (Provider):** Cung cấp chi tiết user theo ID.
+
+### 💻 Bước 1: Thiết lập Project và Dependencies
+
+Chúng ta cần thêm dependencies Pact vào cả hai dự án Consumer và Provider (tùy ngôn ngữ, ví dụ Java/Kotlin hoặc JavaScript).
+
+*(Giả sử môi trường phát triển là Spring Boot / Maven)*
+```xml
+<!-- Thêm dependency cho việc viết test contract -->
+<dependency>
+    <groupId>au.spockframework</groupId>
+    <artifactId>pact-jvm-consumer-junit5</artifactId>
+    <version>[latest_version]</version>
+    <scope>test</scope>
+</dependency>
+
+<!-- Thêm dependency cho việc kiểm tra contract (ở Provider) -->
+<dependency>
+    <groupId>com.github.prisca</groupId>
+    <artifactId>pact-provider-spring-boot-starter</artifactId>
+    <version>[latest_version]</version>
+    <scope>test</scope>
+</dependency>
+```
+
+### 💻 Bước 2: Viết Test Consumer (Tạo Contract)
+
+Trong `OrderService` (Consumer), chúng ta sẽ viết một bài test. Thay vì gọi API thật, Pact sẽ tạo ra các yêu cầu giả định và lưu lại hợp đồng.
+
+**Ví dụ Code tại OrderService:**
 ```java
-// Consumer Test Code (Trong Service A)
-@Test
-void shouldFetchUserById() {
-    // 1. Khởi tạo đối tượng Pact
-    Pact pact = new PactBuilder("ServiceA", "ServiceB")
-        .hasPact("pact-user-v1")
-        .toMockServer();
+// Class chứa logic kiểm thử cho OrderService
+@ExtendWith(PactTestFor.class) // Annotation của Pact để biết đây là Consumer test
+class OrderServiceContractTest {
 
-    // 2. Định nghĩa expectation (Hợp đồng)
-    pact.given("User exists in the database") // Setup State
-        .uponReceiving("a request for user details")
-        .path("/api/users/123")
-        .method("GET")
-        .willRespondWith()
-            .status(200)
-            .bodyJsonWriter("{ \"id\": 123, \"name\": \"Alice\", \"email\": \"alice@corp.com\" }"); // Định nghĩa Schema mong đợi
+    private PactBuilder pactBuilder;
 
-    // 3. Chạy test và Pact sẽ generate tệp contract JSON/YAML
-    pact.verify();
+    @BeforeEach
+    void setup() {
+        pactBuilder = new PactBuilder();
+    }
 
-    // Sau khi chạy xong, gói này tạo ra: pact-serviceA_ServiceB.json
+    @Test
+    void should_process_order_with_valid_user(PactBuilder pactBuilder) {
+        // 1. Khởi tạo Contract Test Environment
+        pactBuilder.given("User Service is running") // Thiết lập giả định: Provider đang hoạt động
+            .uponReceiving("a request for a user by ID")
+            .path("/users/123")
+            .method("GET")
+            // 2. Định nghĩa mong muốn (Mock Response)
+            .willRespondWith()
+            .withHeader("Content-Type", "application/json")
+            .withStatus(200)
+            .withBody("""
+                {
+                    "id": 123,
+                    "firstName": "Alice",
+                    "lastName": "Smith",
+                    "email": "alice@example.com"
+                }
+            """)
+            .toPact(); // <-- Hàm này thực hiện việc ghi lại Pact JSON
+
+        // 3. Viết logic nghiệp vụ (Trong bài test này, chúng ta gọi hàm giả lập)
+        String orderDetails = orderService.createOrder(123);
+
+        // Kiểm tra kết quả dựa trên contract đã thiết lập
+        assertThat(orderDetails).contains("Alice Smith");
+    }
 }
 ```
-*   **Giải thích của Hồng Dung:** Đoạn code trên không phải là kiểm thử E2E. Nó chỉ đang **ghi lại một giao dịch thành công (Transaction)** theo format Pact. Khi `pact.verify()` hoàn tất, nó sẽ tạo ra tệp tin hợp đồng (`.json`). Tệp này chính là tài liệu "Hợp đồng" giữa hai bên.
 
-### Giai đoạn 2: Người Cung Cấp (Provider) Kiểm tra Hợp đồng
-*   **Mục đích:** `Service B` phải kiểm tra xem nó có thể đáp ứng tất cả các hợp đồng được ghi lại hay không.
-*   **Thực hiện:** Chúng ta sử dụng Pact Runner (hoặc một công cụ tương tự) để cung cấp toàn bộ các tệp `.json` nhận được từ tất cả các Consumer. `Service B` sẽ chạy qua từng contract này và kiểm tra xem *mọi endpoint, mọi schema dữ liệu* có hoạt động đúng không.
+**Giải thích của Hồng Dung (QE Insight):**
+*   `PactBuilder`: Đây là "bàn vẽ" giúp chúng ta mô phỏng và ghi lại giao tiếp API.
+*   `.willRespondWith()`: Phần này cực kỳ quan trọng. Nó *không phải* là test thực tế mà nó **ghi lại định dạng (schema) của Response** mà `OrderService` *mong đợi* từ `UserService`.
+*   Khi chạy bộ test này, Pact sẽ xuất ra một file JSON (`pact-service/provider/user_service.json`). File này chính là hợp đồng giữa Order và User Service.
 
-**Kết quả:**
-1.  Nếu `Service B` vượt qua tất cả các hợp đồng $\rightarrow$ **PASS**. (An toàn!)
-2.  Nếu `Service B` thay đổi API một cách phá vỡ (ví dụ: xóa trường `name`) và làm cho bài test Pact thất bại $\rightarrow$ **FAIL**. (Cảnh báo ngay lập tức! Phải sửa.)
+### 💻 Bước 3: Triển khai Test Provider (Kiểm tra Hợp Đồng)
 
-### Giai đoạn 3: Xuất bản Hợp đồng (Pact Broker)
-*   **Mục đích:** Đây là bước quan trọng nhất. Chúng ta cần một nguồn tin cậy để biết trạng thái của các hợp đồng qua thời gian và giữa các môi trường (Dev, Staging, Prod).
-*   **Giải pháp:** Sử dụng **Pact Broker**. Sau khi `Service A` chạy test thành công và tạo ra contract, nó sẽ đẩy contract này lên Pact Broker.
+Bây giờ, chúng ta chuyển sang `UserService` (Provider). Mục tiêu của nó không phải là viết logic nghiệp vụ, mà là chạy **bộ test Pact** để đảm bảo rằng API thực tế của nó *thực sự* trả về theo những gì Consumer đã yêu cầu trong file JSON ở Bước 2.
 
-> 📢 **Lời khuyên của Hồng Dung:** Việc tích hợp Pact Broker vào CI/CD không chỉ giúp lưu trữ mà còn cho phép bạn thực hiện *Can I Deploy?* check. Trước khi `Service A` được deploy sang môi trường Production, hệ thống sẽ tự động hỏi: "Các service nào đã cập nhật và làm thay đổi Contract này chưa?"
+**Ví dụ Code tại UserService:**
+```java
+// Tùy thuộc vào framework, chúng ta sẽ sử dụng Spring Boot Test và Pact Provider Starter
+@SpringBootTest
+class UserServiceContractVerification {
+
+    @Autowired
+    private World p; // Đối tượng của Pact World
+
+    @BeforeAll
+    static void setup() {
+        // Giả định rằng file 'user_service.json' đã được generate ở bước Consumer Test
+        p.given("User Service is running"); 
+        
+        // Bắt đầu quá trình kiểm tra contract với file JSON cụ thể
+        try (World world = p.runMatchingPact(
+            "OrderService", // Tên Consumer
+            "user_service-contract", // Tên Pact File
+            "pact-service/provider/user_service.json")) {
+
+            // Nếu hàm này chạy thành công, nghĩa là tất cả các endpoints trong file JSON đều hoạt động đúng!
+            world.verifyMatchingPact(); 
+        } catch (VerificationException e) {
+            System.err.println("❌ THẤT BẠI HỢP ĐỒNG: Provider đã thay đổi API!");
+        }
+    }
+
+    // ... Code Controller RESTful API thực tế của UserService sẽ nằm ở đây...
+}
+```
+
+**Giải thích của Hồng Dung (QE Insight):**
+*   `p.runMatchingPact()`: Đây là hàm thần kỳ. Nó bảo framework đi qua mọi yêu cầu và response được ghi trong file Pact JSON, sau đó gọi các phương thức thực tế của Provider Service (`UserService`) để xem liệu nó có trả về cùng schema đó hay không.
+*   **Giá trị cốt lõi:** Nếu bạn vô tình đổi tên trường `firstName` thành `first_name` trong code API của `UserService`, thì khi chạy test ở bước 3, Pact sẽ bắt được sự khác biệt này và **bộ test sẽ thất bại ngay lập tức**, cho phép bạn sửa lỗi trước khi deploy.
 
 ***
 
-## 🚀 Tích hợp Pact vào CI/CD Pipeline (Workflow Toàn diện)
+## ✅ IV. Tóm tắt Quy trình làm việc (The Workflow Summary)
 
-Để tận dụng tối đa sức mạnh của Pact, bạn phải triển khai nó như một bước bắt buộc trong quy trình Continuous Integration (CI).
+Việc tích hợp Contract Testing thành công yêu cầu một quy trình CI/CD rõ ràng:
 
-**Flow đồ hoàn hảo:**
-
-1.  **Consumer Build (`Service A`):**
-    *   Chạy unit test + chạy `pact-generate` $\rightarrow$ Tạo file contract JSON/YAML.
-2.  **Publish to Pact Broker:**
-    *   Đẩy file contract lên Pact Broker (Ghi nhận: *Tải phiên bản x.y của Service A yêu cầu schema này từ Service B*).
-3.  **Provider Build (`Service B`):**
-    *   Lấy tất cả các contract gần nhất cần được kiểm tra từ Pact Broker.
-    *   Chạy `pact-provider-verify` với bộ test và hợp đồng đó.
-4.  **Gate Check (Pact Broker):**
-    *   Nếu bước 3 thành công, và Consumer đã ký vào Contract này, thì Broker cho phép deploy.
-
-### Lợi ích vô giá:
-*   **Tốc độ:** Các bài kiểm thử chỉ chạy trên API hợp đồng (Mocking), không cần kết nối thực với database hay các dịch vụ bên ngoài $\rightarrow$ **Siêu nhanh.**
-*   **Tính cô lập:** Sự cố trong `Service B` sẽ làm *thất bại* test của nó, chứ không phải gây ra lỗi tích hợp khó tìm ở `Service A`.
-*   **Phòng ngừa Drift:** Nó ngăn chặn tình trạng các dịch vụ bị "trôi dạt" (drift) khỏi schema ban đầu mà không hề hay biết.
+1. **Consumer Service:**
+    *   Chạy Test Unit/Integration -> Tạo Pact JSON.
+    *   Tải các file Pact JSON này lên **Pact Broker**.
+2. **Pact Broker (The Central Hub):**
+    *   Lưu trữ tất cả các hợp đồng được xác minh và duy trì phiên bản của chúng.
+3. **Provider Service:**
+    *   Tại mỗi lần Build, Provider sẽ kết nối với Pact Broker để lấy danh sách các Consumer phụ thuộc vào nó.
+    *   Nó chạy bộ test (Bước 3) đối chiếu tất cả các hợp đồng nhận được.
+    *   Nếu *tất cả* contract đều vượt qua, thì Service đã "được chứng nhận" là tương thích và sẵn sàng để triển khai.
 
 ***
 
-## 📌 Tổng kết và Lời khuyên cuối cùng từ Hồng Dung
+## 🌟 Kết luận: Tại sao bạn nên áp dụng Contract Testing? (My Recommendation)
 
-Kiểm thử tích hợp Microservices là một bài toán phức tạp, nhưng nó không cần phải được giải quyết bằng việc xây dựng những bộ test E2E đồ sộ và dễ đổ vỡ.
+Là một QE Lead, tôi thấy rằng việc chuyển từ E2E testing sang Contract Testing không chỉ là thay đổi công cụ, mà là **một sự thay đổi về tư duy kiểm thử**.
 
-Bằng cách áp dụng **Contract Testing với Pact Framework**, chúng ta đang chuyển giao trách nhiệm của kiểm thử từ "Chạy mọi thứ cùng lúc" sang "Xác minh các thỏa thuận đã đạt được".
+*   **Tốc độ:** Các bộ test chạy nhanh hơn rất nhiều vì chúng ta loại bỏ các bước setup môi trường phức tạp.
+*   **Độ tin cậy (Reliability):** Độ phủ lớp API được đảm bảo bằng hợp đồng, giúp giảm thiểu rủi ro lỗi tích hợp không ngờ đến.
+*   **Quy mô:** Hệ thống có thể mở rộng quy mô và số lượng microservices một cách an toàn mà không sợ bị phụ thuộc chằng chịt.
 
-| Feature | Integration Test (E2E) | Contract Test (Pact) |
-| :---: | :---: | :---: |
-| **Phạm vi** | Toàn bộ hệ thống, trạng thái DB. | Giữa 2 service cụ thể (A $\leftrightarrow$ B). |
-| **Tốc độ** | Chậm (Thiếu sót thứ tự khởi động). | Rất nhanh (Mocked dependencies). |
-| **Báo cáo Lỗi** | Khó định vị (Lỗi ở đâu?). | Cụ thể (Ai thay đổi cái gì?). |
-| **Tính bền vững** | Thấp (Dễ bị break bởi schema minor change). | Cao (Chỉ cần thỏa thuận hợp đồng được duy trì). |
+Nếu bạn đang xây dựng kiến trúc Microservices với tốc độ phát triển cao, hãy coi Pact Framework là "vệ tinh" giúp giữ ổn định quỹ đạo của các service liên quan. Nó sẽ tiết kiệm cho đội ngũ QA và Development hàng trăm giờ công sức debugging không cần thiết trong tương lai!
 
-Nếu đội ngũ của bạn đang tìm kiếm một giải pháp để tăng tốc độ phát hành mà không làm giảm chất lượng, hãy mạnh dạn tích hợp Pact Framework vào CI/CD pipeline của mình.
-
-Chúc các anh chị áp dụng thành công và xây dựng nên những kiến trúc Microservices vững chắc! Nếu có bất kỳ thắc mắc nào về việc cấu hình hoặc tối ưu hóa Contract Testing, đừng ngần ngại để lại bình luận nhé.
+Chúc các anh chị luôn có những hệ thống phần mềm chất lượng cao!
+— Hồng Dung.
