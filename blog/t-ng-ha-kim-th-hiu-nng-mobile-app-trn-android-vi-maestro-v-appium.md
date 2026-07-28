@@ -1,141 +1,166 @@
 ---
 title: "Tự động hóa kiểm thử hiệu năng Mobile App trên Android với Maestro và Appium"
 date: 2026-03-25
-description: "Khám phá chiến lược tự động hóa kiểm thử hiệu năng (Performance Testing) chuyên sâu cho ứng dụng di động Android, kết hợp sức mạnh của Maestro và khung Appium."
-tags: ["Mobile Testing","Maestro","Appium","Performance Engineering"]
+description: "Hướng dẫn chuyên sâu cách thiết lập quy trình tự động hóa kiểm thử hiệu năng trên Android, tối ưu hóa bằng sự kết hợp sức mạnh của Appium và Maestro."
+tags: ["Mobile Testing","Maestro","Android"]
 imageUrl: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=600"
 author: "Khánh Đỗ"
 ---
 
 # Tự động hóa kiểm thử hiệu năng Mobile App trên Android với Maestro và Appium
 
-Chào các anh em đồng nghiệp và các nhà phát triển Chất lượng (QA). Tôi là Khánh Đỗ, chuyên viên Kỹ thuật Đảm bảo Chất lượng (QE Lead), và trong suốt sự nghiệp của mình, tôi đã chứng kiến rất nhiều thay đổi trong lĩnh vực kiểm thử phần mềm. Ngày nay, việc chỉ đảm bảo ứng dụng *hoạt động* được nữa là chưa đủ; chúng ta phải đảm bảo nó hoạt động *tốt*, đặc biệt khi đối mặt với tải trọng người dùng thực tế và sự đa dạng của các thiết bị Android.
+Chào các đồng nghiệp QA và đội ngũ phát triển sản phẩm, tôi là Khánh Đỗ. Trong hành trình xây dựng một sản phẩm di động chất lượng cao, việc đảm bảo ứng dụng *hoạt động* (functional) chỉ là bước khởi đầu. Điều khiến người dùng ở lại – và quyết định sự thành công thương mại của ta – chính là tốc độ phản hồi, tính ổn định dưới tải trọng lớn, và trải nghiệm mượt mà ngay cả khi mạng kém.
 
-Nếu công cụ tự động hóa truyền thống giúp chúng ta tìm ra bug về chức năng (functional bugs), thì việc kết hợp **Maestro** và **Appium** sẽ trang bị cho đội ngũ QA khả năng kiểm thử *hiệu năng* và *trải nghiệm người dùng dưới áp lực* một cách chuyên nghiệp và hiệu quả nhất.
+Đó là lúc **Kiểm thử Hiệu năng (Performance Testing)** trở nên cực kỳ quan trọng.
 
-Bài viết này không chỉ là lý thuyết suông; tôi sẽ đi sâu vào chiến lược, kiến trúc thực tế và các đoạn mã ví dụ chi tiết để giúp quý vị thiết lập quy trình kiểm thử hiệu năng di động (Mobile Performance Testing) hoàn chỉnh trên Android.
+Trong bài viết này, chúng ta sẽ cùng nhau đi sâu vào một chủ đề chuyên sâu: làm thế nào để tự động hóa quá trình kiểm thử hiệu năng trên nền tảng Android bằng sự kết hợp chiến lược giữa **Appium** và **Maestro**. Chúng ta không chỉ dừng lại ở việc kiểm tra luồng (flow), mà còn đo lường từng mili giây.
 
-***
+## I. Hiểu rõ Vấn đề: Tại sao cần Performance Testing trong Mobile?
 
-## 🚀 Tại sao cần kết hợp Maestro và Appium cho Hiệu Năng?
+Nhiều người nhầm lẫn hiệu năng với khả năng chịu tải (Load Testing). Thực tế, chúng là hai khía cạnh khác nhau khi kiểm thử ứng dụng di động:
 
-Trong môi trường kiểm thử tự động, chúng ta thường phải lựa chọn một công cụ chính: chỉ dùng Appium hay chỉ dùng các công cụ CI/CD tích hợp sẵn? Câu trả lời là **cả hai**, nhưng mỗi công cụ lại giải quyết một khía cạnh khác nhau của chu trình kiểm thử hiệu năng.
+1.  **Performance/Speed:** Đo lường tốc độ *tác vụ* của một luồng người dùng đơn lẻ (Single User Flow) – Ví dụ: Thời gian từ lúc nhấn nút "Thanh toán" đến khi màn hình xác nhận hiển thị, bao gồm cả thời gian xử lý UI và giao tiếp mạng.
+2.  **Load/Stress:** Đo lường khả năng ứng dụng duy trì tính ổn định khi hàng trăm người dùng cùng thực hiện tác vụ đồng thời (Concurrency).
 
-### 🎯 Vai trò của Appium (Framework Level)
+Khi ta nói về tự động hóa hiệu năng trên Android bằng Appium/Maestro, chúng ta chủ yếu tập trung vào việc **đo lường và xác minh các chỉ số hiệu suất UI và trải nghiệm người dùng** dưới điều kiện hành vi nhất quán. Chúng ta muốn tìm ra các nút thắt cổ chai (bottlenecks) của ứng dụng ngay tại lớp giao diện và tương tác.
 
-Appium là lớp nền tảng mô phỏng việc tương tác người dùng trên các ứng dụng di động (thông qua WebDriver protocol). Nó cung cấp sự linh hoạt tối đa, khả năng viết code bằng ngôn ngữ lập trình mạnh mẽ (Python, Java, JavaScript), và khả năng tương tác với các API kiểm thử hiệu năng bên ngoài (như kết nối với JMeter hoặc Gatling nếu cần mô phỏng load backend).
+## II. Sức mạnh bổ sung: Appium vs. Maestro
 
-*   **Ưu điểm:** Kiểm soát logic ứng dụng tuyệt đối; dễ dàng tích hợp vào CI/CD phức tạp.
-*   **Hạn chế trong bối cảnh Performance:** Việc viết các kịch bản kiểm thử hiệu năng (ví dụ: "người dùng click nút này 10 lần liên tiếp trong vòng 5 giây") có thể trở nên rất dài dòng và yêu cầu nhiều code boilerplate, làm chậm quá trình phát triển test case.
+Trước khi đi vào thực chiến, chúng ta cần nắm rõ vai trò lý tưởng của hai công cụ này trong ngữ cảnh QE chuyên sâu:
 
-### ✨ Vai trò của Maestro (Test Case Definition Level)
+### 🅰️ Appium (The Industry Standard)
+*   **Vai trò:** Là framework toàn diện để tương tác với các ứng dụng mobile (Android/iOS). Nó mô phỏng hành vi người dùng qua các phương thức như `findElement`, `click`, `sendKeys`.
+*   **Điểm mạnh trong QE:** Độ ổn định cao, khả năng mở rộng lớn, hỗ trợ đa ngôn ngữ và nhiều framework test (Selenium WebDriver, Cucumber, v.v.). Rất phù hợp khi bạn cần kiểm soát sâu vào các API/driver cấp thấp.
+*   **Hạn chế:** Thiết lập ban đầu phức tạp hơn, yêu cầu kiến thức về thiết lập môi trường (WebDriver Manager, Service setup).
 
-Maestro là một công cụ kiểm thử người dùng (user-flow testing tool) được thiết kế với mục tiêu tạo ra các kịch bản mô phỏng hành vi người dùng **siêu dễ đọc** và **nhanh chóng**. Nó hoạt động theo nguyên tắc ghi lại (record/playback) nhưng nâng cao hơn rất nhiều.
+### 🅱️ Maestro (The Flow Automation Tool)
+*   **Vai trò:** Là công cụ scripting trực quan và mạnh mẽ để ghi lại/thiết kế các luồng người dùng (User Flows) theo dạng YAML hoặc JSON. Nó tập trung vào sự đơn giản và tốc độ triển khai.
+*   **Điểm mạnh trong QE:** Cú pháp dễ hiểu, rất nhanh để tạo ra kịch bản phức tạp mà không cần viết quá nhiều mã lệnh boilerplate. Lý tưởng cho việc kiểm thử End-to-End (E2E) với yêu cầu cao về luồng đi.
+*   **Kết hợp tối ưu:** Maestro giúp ta định hình luồng test một cách cực kỳ nhanh chóng, và chúng ta có thể sử dụng các tính năng logging hoặc tích hợp Appium API khi cần độ chính xác kỹ thuật cao hơn để đo lường thời gian cụ thể.
 
-*   **Ưu điểm:** Cú pháp cực kỳ ngắn gọn, gần với ngôn ngữ tự nhiên ("Click X," "Wait for Y"); lý tưởng để xác định các luồng nghiệp vụ phức tạp và lặp đi lặp lại – vốn là trọng tâm của kiểm thử hiệu năng.
-*   **Lợi thế về Performance:** Maestro cho phép ta tập trung mô phỏng hành vi người dùng (User Behavior Flow) mà không bị sa đà vào việc quản lý WebDriver API, giúp kịch bản mạch lạc và dễ bảo trì hơn nhiều khi cần tăng tần suất chạy (stressing the app).
+**Tóm lại:**
+*   **Sử dụng Maestro** để xây dựng khung kịch bản (Scripting Framework) cho luồng test hiệu năng E2E.
+*   **Bổ sung bằng Appium/Python WebDriver** khi cần các lệnh tùy chỉnh, đo lường thời gian thực tế giữa các hành động, hoặc tích hợp với các công cụ báo cáo chuyên sâu hơn.
 
-### 🤝 Chiến lược Kết hợp (The Synergy)
+## III. Chiến lược Thực thi: Đo lường Thời gian Tương tác (Measuring Interaction Latency)
 
-Chúng ta sử dụng Maestro để định nghĩa các **kịch bản luồng người dùng (User Flow Scripts)** một cách trực quan, ngắn gọn. Sau đó, chúng ta xây dựng một lớp wrapper hoặc một hệ thống CI/CD bên ngoài sử dụng Appium và ngôn ngữ lập trình mạnh mẽ để:
+Trong ngữ cảnh tự động hóa hiệu năng UI, mục tiêu của chúng ta không chỉ là kiểm tra xem test có PASS/FAIL hay không, mà còn phải thu thập các dữ liệu định lượng sau:
+1. **Time to Element:** Thời gian ứng dụng mất để hiển thị phần tử (Element).
+2. **Action Latency:** Thời gian từ khi lệnh click được gửi đến Appium Engine cho đến khi giao diện phản hồi hoàn toàn.
 
-1.  **Điều phối:** Kích hoạt kịch bản Maestro với tốc độ cao trên nhiều thiết bị giả lập (emulators) hoặc vật lý (real devices).
-2.  **Đo lường:** Thu thập các chỉ số hiệu năng hệ thống (System Metrics – CPU, Memory, Battery usage) ngoài luồng tương tác UI, điều mà Appium cơ bản không làm được một cách dễ dàng.
+Chúng ta sẽ sử dụng Python với thư viện `time` kết hợp khả năng scripting của Maestro để đạt được mục tiêu này.
 
-***
+### 💡 Ví dụ Tình huống: Đo lường hiệu suất quy trình Đăng nhập (Login Flow)
 
-## 💻 Hướng dẫn Thực chiến: Xây dựng Kịch bản Hiệu năng trên Android
+Giả sử chúng ta muốn đo tổng thời gian cần thiết để người dùng hoàn thành việc đăng nhập, bao gồm cả thời gian mạng giả lập và tốc độ phản hồi UI.
 
-Giả sử chúng ta đang kiểm thử tính năng "Đăng nhập và Tải danh sách sản phẩm" của một ứng dụng thương mại điện tử. Đây là nơi các vấn đề hiệu năng (ví dụ: màn hình tải chậm, lag khi cuộn) thường xảy ra nhất.
+#### Bước 1: Thiết lập kịch bản bằng Maestro (Conceptual Scripting)
+Chúng ta sẽ định nghĩa các bước hành động (actions) một cách tuần tự trong file script của Maestro.
 
-### Bước 1: Viết kịch bản cơ bản bằng Maestro (Tập trung vào Luồng người dùng)
-
-Maestro cho phép bạn viết test case giống như một bộ hướng dẫn sử dụng:
-
-**`login_and_view_products.yaml`**
 ```yaml
-# Hành vi người dùng: Mở app, nhập thông tin, và cuộn danh sách sản phẩm 10 lần liên tiếp.
-- tap[id="com.ecommerce:activity:login"] # Bấm vào nút Login
-- fill text[id="username_input", text="tester@example.com"] # Nhập Username
-- fill text[id="password_input", text="securepass123"] # Nhập Password
-- tap[id="button_submit"] # Click Submit
-# --- Bắt đầu phần kiểm thử hiệu năng (Stress/Stressing) ---
-- wait for element[selector="#product_list"] # Đợi danh sách tải xong
-- swipe(x=500, y=1200, x=500, y=200, duration=200) # Thực hiện hành động cuộn màn hình (Animation/Scroll stress)
-# Để tăng cường kiểm thử hiệu năng, ta lặp lại hành động này N lần.
-# Trong môi trường CI/CD thực tế, chúng ta sẽ dùng script bên ngoài để loop lệnh này.
-- wait for element[selector="#product_list"] 
+# Pseudo-code/YAML structure for Maestro flow definition
+---
+testName: "Login_Performance_Test"
+steps:
+  - action: 'Open App' 
+    selector: '[resource-id=com.myapp:id/login_screen]'
+    wait: 2s # Simulate network delay or necessary loading time
+
+  # Bắt đầu đo lường hiệu năng thực tế
+  - action: 'Type Text' 
+    selector: '#username_input'
+    text: 'testuser@example.com'
+    waitForElement: true
+  
+  - action: 'Tap' 
+    selector: '#password_input'
+    wait: 0.5s # Giả lập việc người dùng nhìn và gõ mật khẩu
+
+  - action: 'Type Text' 
+    selector: '#password_input'
+    text: 'securepass123'
+  
+  # Hành động quan trọng nhất: Click nút Đăng nhập
+  - action: 'Tap' 
+    selector: '#login_button'
+    metric: "Time_to_Success" # Tên metric cần ghi lại
+
+  # Đo lường khi chuyển trang (Navigation Speed)
+  - wait: 3s # Wait for dashboard load completion
 ```
 
-**Giải thích của Khánh Đỗ:** Bằng cách sử dụng cú pháp YAML đơn giản, Maestro đã giúp tôi định nghĩa toàn bộ luồng người dùng trong vài dòng mà không cần bận tâm về việc khởi tạo `driver`, tìm kiếm phần tử bằng XPath phức tạp hay xử lý các ngoại lệ WebDriver. Điều này tiết kiệm thời gian và làm tăng khả năng đọc hiểu cho cả đội QA/DevOps.
+#### Bước 2: Tích hợp Python/Appium để Capture Metrics
+Khi sử dụng Appium qua Python, chúng ta có thể wrap các lệnh cơ bản bằng các hàm đo thời gian (`time.time()`) xung quanh từng hành động chính. Đây là nơi QE Lead phải can thiệp sâu nhất.
 
-### Bước 2: Tích hợp vào CI/CD (Sử dụng Appium/Python để điều phối tải trọng)
-
-Để chuyển kịch bản Maestro thành một bài kiểm thử hiệu năng thực thụ, chúng ta cần một "Engine" bên ngoài để điều khiển tốc độ và số lượng lần lặp lại. Ở đây, tôi sử dụng Python với các thư viện Appium (dù không gọi API trực tiếp của nó, nó đại diện cho khả năng điều phối mạnh mẽ).
-
-**`run_performance_test.py`**
 ```python
-import subprocess
+from appium import webdriver
 import time
 
-def run_stress_test(yaml_file: str, iterations: int, device_id: str):
-    print(f"[*] Bắt đầu kiểm thử tải trọng ({iterations} lần lặp) trên thiết bị {device_id}")
+# Thiết lập WebDriver (Giả sử đã khởi tạo)
+driver = webdriver.Remote('http://localhost:4723/wd/hub', capabilities) 
+
+def measure_action(element_xpath, action_type):
+    """Hàm bao bọc để đo thời gian thực hiện bất kỳ hành động nào."""
+    start_time = time.time()
     
-    for i in range(iterations):
-        start_time = time.time()
-        try:
-            # Gọi Maestro CLI để chạy kịch bản đã định nghĩa
-            # Tham số này giúp truyền thông tin về thiết bị và luồng lặp lại.
-            command = f"maestro test --device {device_id} {yaml_file}" 
-            subprocess.run(command, shell=True, check=True)
-            print(f"[+] Lần lặp {i+1}/{iterations}: Thành công.")
-        except subprocess.CalledProcessError as e:
-            print(f"[-] Lần lặp {i+1}/{iterations}: Thất bại! Mã lỗi: {e}")
-            # Đây là điểm quan trọng để ghi lại failure point khi kiểm thử tải nặng
-            break 
+    try:
+        # Thực hiện hành động (ví dụ: tìm và click)
+        element = driver.find_element(By.XPATH, element_xpath)
+        element.click() 
         
-        # Giới hạn tốc độ giữa các lần lặp để mô phỏng hành vi người dùng thực tế (Rate Limiting)
-        time.sleep(2) # Nghỉ 2 giây sau mỗi chu kỳ hoàn thành
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"[{action_type}] Completed in: {elapsed_time:.3f} seconds.")
+        return elapsed_time
 
-if __name__ == "__main__":
-    # Thiết lập cấu hình môi trường kiểm thử
-    TEST_SCRIPT = "login_and_view_products.yaml"
-    NUM_ITERATIONS = 10  # Tăng từ 1 đến 10 cho bài test stress
-    TARGET_DEVICE = "emulator-5554" # Hoặc IP:Port của thiết bị thực
+    except Exception as e:
+        print(f"Error during {action_type}: {e}")
+        return None
 
-    run_stress_test(TEST_SCRIPT, NUM_ITERATIONS, TARGET_DEVICE)
+# === Kịch bản chạy đo lường hiệu năng Login ===
+
+# 1. Đo thời gian tải màn hình (Time to Screen Load)
+start_load = time.time()
+driver.find_element(By.ID, "login_screen") # Chỉ cần tìm element đại diện cho trang
+load_time = time.time() - start_load
+print(f"\n[Metric 1: Page Load Time] Tổng thời gian tải màn hình Login: {load_time:.3f}s")
+
+
+# 2. Đo tốc độ tương tác (Interaction Latency)
+login_xpath = "//android.widget.Button[@text='Login']"
+interaction_latency = measure_action(login_xpath, "Click Login Button")
+
+if interaction_latency is not None:
+    print("-" * 30)
+    print("✅ Báo cáo Hiệu năng Tương tác (Interaction Performance Report)")
+    print(f"Thời gian tương tác Đăng nhập tối ưu nhất phải < X giây.")
+    print(f"Kết quả thực tế: {interaction_latency:.3f} seconds.")
+
+# Cuối cùng, kiểm tra điều kiện nghiệp vụ sau khi đo lường
+assert "Welcome Dashboard" in driver.page_source, "Test failed: Did not reach the expected dashboard page."
 ```
 
-**Giải thích của Khánh Đỗ:** Trong script này, Appium (hoặc bất kỳ framework nào có thể điều khiển Maestro CLI) đóng vai trò là **Bộ Điều phối Tải Trọng (Load Orchestrator)**. Nó chịu trách nhiệm:
-1.  Lặp lại kịch bản Maestro (tăng cường stress).
-2.  Đảm bảo rằng các bước *bắt buộc* về hệ thống (như chụp ảnh màn hình, thu thập log crash) được thực hiện khi có lỗi.
-3.  Cung cấp khả năng **metrics aggregation** bằng cách gọi thêm các API bên ngoài (ví dụ: `adb shell dumpsys meminfo`) sau mỗi lần chạy Maestro để đo lường bộ nhớ và CPU.
+## IV. Tối ưu hóa Quy trình QE với Maestro và Appium
 
-***
+Để biến quy trình trên thành một hệ thống CI/CD hiệu quả, tôi xin đưa ra vài lưu ý từ kinh nghiệm thực chiến của một Lead QE:
 
-## 📊 Vượt ra ngoài UI Test: Đo lường Hiệu Năng Hệ thống
+### 🎯 1. Xử lý Tính bất định (Handling Non-Determinism)
+Hiệu năng luôn phụ thuộc vào môi trường (thiết bị vật lý vs. Emulator, tốc độ mạng mô phỏng). Tuyệt đối không sử dụng `time.sleep(5)` cứng nhắc. Hãy thay thế bằng các cơ chế chờ thông minh hơn:
 
-Một bài kiểm thử hiệu năng hoàn chỉnh không chỉ dừng lại ở việc "App có thoát hay không?". Chúng ta phải định lượng được mức độ tiêu thụ tài nguyên.
+*   **Explicit Waits:** Sử dụng hàm đợi đến khi một điều kiện cụ thể được thỏa mãn (ví dụ: `WebDriverWait`).
+*   **Auto-wait/Implicit wait:** Cấu hình Appium để nó tự động nhận diện và chờ phần tử xuất hiện trong phạm vi thời gian cho phép.
 
-Nếu bạn muốn nâng tầm quy trình QA, hãy tích hợp các lệnh hệ thống (System Commands) của Android Debug Bridge (`adb`) vào vòng lặp Appium/Maestro:
+### 🔌 2. Mô phỏng Tải trọng Thực tế (Simulating Concurrency)
+Nếu bạn cần kiểm tra khả năng chịu tải cao, việc chạy kịch bản bằng một script Python đơn lẻ là chưa đủ. Bạn cần:
+*   **Sử dụng các Executor Tools:** Chạy nhiều phiên bản của cùng kịch bản Maestro/Appium cùng lúc, thông qua Selenium Grid hoặc cloud testing platforms (như BrowserStack/Sauce Labs) và ghi lại dữ liệu performance từ tất cả các phiên này để tính toán độ lệch chuẩn (Standard Deviation).
 
-```bash
-# Ví dụ về việc thu thập Metrics tại thời điểm kiểm thử tải nặng
-adb shell dumpsys gfxinfo [package_name] --dump-cls
-adb shell proactor monitor
-adb logcat -d | grep "Performance Warning" 
-```
+### 📊 3. Báo cáo Dữ liệu Hiệu năng (Reporting Performance Data)
+Không chỉ là PASS/FAIL, một báo cáo QE chuyên nghiệp phải kèm theo:
+*   **Tổng thời gian luồng test:** Tổng thời gian từ đầu đến cuối các bước chính.
+*   **Thời gian tối đa và trung bình (Max/Avg Time):** Giúp đội ngũ phát triển biết được điểm tệ nhất trong chu kỳ test.
 
-Bằng cách chạy các lệnh này song song với kịch bản Maestro đang hoạt động, bạn sẽ có một bức tranh toàn diện: *App đã thực hiện xong luồng chức năng*, **VÀ** *trong quá trình đó, nó tiêu thụ bao nhiêu CPU và gây ra những vấn đề nào về rendering*.
+## Lời kết của Khánh Đỗ
 
-## 💡 Tóm kết & Lời Khuyên từ QE Lead
+Tự động hóa kiểm thử hiệu năng không phải là việc viết thêm code, mà là việc **thiết lập một quy trình đo lường và xác minh các giả định về tốc độ**. Bằng cách kết hợp sự linh hoạt về luồng nghiệp vụ của Maestro với khả năng can thiệp sâu vào thời gian thực bằng Appium/Python, đội ngũ QE có thể chuyển từ việc chỉ kiểm tra *nó có chạy không* sang việc đảm bảo *nó chạy nhanh và ổn định ở mọi điều kiện*.
 
-| Tính Năng | Appium (Framework) | Maestro (Scripting Layer) | Hệ thống Bao ngoài (Python/CI) |
-| :--- | :--- | :--- | :--- |
-| **Mục đích chính** | Điều khiển, Báo cáo chi tiết. | Định nghĩa luồng người dùng dễ đọc. | Điều phối tải trọng, Thu thập Metrics sâu. |
-| **Kiểm thử Hiệu năng** | Xử lý lỗi khi test stress. | Mô phỏng hành vi lặp lại (stressing the flow). | Lặp kịch bản và đo tài nguyên hệ thống (CPU/Mem). |
-| **Ưu điểm nổi bật** | Linh hoạt, Tích hợp API mạnh mẽ. | Cú pháp ngắn gọn, dễ bảo trì luồng. | Khả năng mở rộng và kiểm soát tốc độ thực thi. |
-
-**Lời khuyên của tôi:** Đừng xem Maestro hay Appium là đối thủ, hãy coi chúng là hai thành phần bổ sung cho nhau trong một giải pháp kiểm thử hiện đại. Hãy để **Maestro định nghĩa "cái gì" (User Flow)**, và dùng **Appium cùng Python/CI/CD xác định "như thế nào" (Stress, Volume, and Metrics Gathering)**.
-
-Chúc các anh em thành công trong việc xây dựng hệ thống tự động hóa kiểm thử chất lượng cao! Nếu có bất kỳ thắc mắc nào về kiến trúc hoặc tối ưu mã nguồn, đừng ngần ngại trao đổi với tôi nhé.
+Hãy bắt đầu đo lường ngay hôm nay, vì trải nghiệm người dùng tốc độ cao là lợi thế cạnh tranh lớn nhất của sản phẩm! Chúc các bạn thành công với những thử thách tự động hóa phức tạp.
